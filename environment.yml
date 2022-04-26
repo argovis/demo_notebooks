@@ -1,0 +1,13 @@
+name: argovis_demos
+
+dependencies:
+  - python=3.9
+  - requests
+  - cartopy
+  - pandas
+  - pip
+  - scipy
+  - numpy
+  - xarray
+  - pip:
+    - svgpath2mpl
