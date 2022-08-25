@@ -5,3 +5,7 @@
 > **This is a beta product!**
 > Argovis' new API is currently undergoing heavy development. Therefore, everything in these notebooks should be understood as a technical preview only; implementation details may change before a 
 stable release is made. Please send feedback and ideas to argovis@colorado.edu.
+
+## See Also
+
+ - [Argovis' EarthCube 2022 submission](https://github.com/earthcube2022/ec22_mills_etal): illustrates dataset colocation, QC filtering, and interpolation.
