@@ -29,13 +29,16 @@ def query_grid_by_region_month_year(grid_name,region_str,levels, \
 
     data_raw = avh.query('grids/'+grid_name, options=params, apikey=API_KEY, apiroot=API_PREFIX)
     
-    metadata_params = {
-        "id": data_raw[0]['metadata']
-        }
-
-    metadata = avh.query('grids/meta', options=metadata_params, apikey=API_KEY, apiroot=API_PREFIX)
+    ##### this below is not needed since we have presRange specified now (hence the pressure levels are returned in data_raw)
     
-    return xargrid(grid=data_raw, depths=metadata[0]['levels'],long_conversion_type=long_conversion_type)
+    #     metadata_params = {
+    #         "id": data_raw[0]['metadata']
+    #         }
+
+    #     metadata = avh.query('grids/meta', options=metadata_params, apikey=API_KEY, apiroot=API_PREFIX)
+
+    
+    return xargrid(grid=data_raw, depths=data_raw[0]['levels'],long_conversion_type=long_conversion_type)
 
 # process
 def xargrid(grid, depths,long_conversion_type):
@@ -58,7 +61,6 @@ def xargrid(grid, depths,long_conversion_type):
             lat.append(p['geolocation']['coordinates'][1])
             time.append(avh.parsetime(p['timestamp']))
             meas.append(p['data'][i][0])
-            # I think this may need editing:
             pressure.append(depths[i])
             
     df = pandas.DataFrame({"latitude": lat, 
