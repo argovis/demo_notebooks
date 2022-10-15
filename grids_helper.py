@@ -58,6 +58,7 @@ def xargrid(grid, depths,long_conversion_type):
             lat.append(p['geolocation']['coordinates'][1])
             time.append(avh.parsetime(p['timestamp']))
             meas.append(p['data'][i][0])
+            # I think this may need editing:
             pressure.append(depths[i])
             
     df = pandas.DataFrame({"latitude": lat, 
