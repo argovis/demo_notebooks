@@ -8,7 +8,7 @@ import matplotlib.patches as patches
 # set up parameteres
 def def_activity_param(str_activity,region_selected,section_selected_lat,depth_level_selected,API_KEY,API_PREFIX):
     if str_activity == 'activity_enso':
-        return {'grid_name': 'temperature_rg', \
+        dic = {'grid_name': 'temperature_rg', \
               'plot_title': 'Temperature, degC', \
               'region': def_reg_activity(str_region=region_selected), \
               'latitude_band_selected': def_zonal_section_activity(str_latitude=section_selected_lat), \
@@ -27,21 +27,65 @@ def def_activity_param(str_activity,region_selected,section_selected_lat,depth_l
               'apikey': API_KEY, \
               'apiroot': API_PREFIX, \
               }
+        # check the region name for the map
+        if region_selected=='equatorial_atlantic' or region_selected=='equatorial_indian':
+            print('HINT: this region will not help you describe the ENSO phases, try another one!')
+        elif region_selected=='equatorial_pacific':
+            print('Good job selecting the region for the map!')
+        else:
+            print('Before displaying the map, please select a valid name for the region')
+            
+        # check the level for the map
+        if depth_level_selected=='near_surface':
+            print('Good job selecting the depth level for the map!')
+        elif depth_level_selected=='near_1500m':
+            print('HINT: this depth level will not help you describe the ENSO phases, try another one!')
+        else:
+            print('Before displaying the map, please select a valid name for the depth level')
+            
+        # check the latitude for the section
+        if section_selected_lat=='equatorial':
+            print('Good job selecting the latitude for the section!')
+        elif section_selected_lat=='subpolar':
+            print('HINT: this latitude will not help you describe the ENSO phases, try another one!')
+        elif section_selected_lat=='midlatitude':
+            print('HINT: this latitude will not help you describe the ENSO phases, try another one!')
+        else:
+            print('Before displaying the section, please select a valid name for the latitude')
+            
+        return dic
+    else:
+        print('Please select a valid name for the activity')
+        return
 
 def def_reg_activity(str_region):
     # returns a list, e.g. [west long, east long, south_lat, north_lat]
     if str_region == 'equatorial_pacific':
         return [150.5,-119.5,-7,7]
+    elif str_region == 'equatorial_indian':
+        return [45,96,-7,7]
+    elif str_region == 'equatorial_atlantic':
+        return [-45.5,6.5,-7,7]
+    else:
+        return []
     
 def def_levels_activity(str_levels):
     # returns a string, i.e. [0, 5]
     if str_levels == 'near_surface':
         return '0,5' 
+    elif str_levels == 'near_1500m':
+        return '1450,1550'
+    else:
+        return []
     
 def def_zonal_section_activity(str_latitude):
     # returns a list, e.g. [south_lat, north_lat]
     if str_latitude == 'equatorial':
         return [-0.5,0.5]
+    elif str_latitude == 'subpolar':
+        return [54.5,56.5]
+    elif str_latitude == 'midlatitude':
+        return [44.5,46.5]
     else:
         return []
 
@@ -174,6 +218,8 @@ def plot_section(data,xaxis,yaxis,cf_levels,cf_levels_line,ylim_bottom,plot_titl
     plt.ylim(bottom=ylim_bottom)
     plt.rcParams['font.size'] = font_size
     plt.title(plot_title)
+    plt.xlabel('Longitude, Degrees East')
+    plt.ylabel('Pressure, dbar')
     plt.show()
     return
     
@@ -188,6 +234,8 @@ def plot_map_enso_activity(data,cf_levels,ylim_bottom,ylim_top,plot_title,font_s
     plt.ylim(bottom=ylim_bottom,top=ylim_top)
     plt.rcParams['font.size'] = font_size
     plt.title(plot_title)
+    plt.xlabel('Longitude, Degrees East')
+    plt.ylabel('Latitude, Degrees North')
     
     plt.gca().add_patch(patches.Rectangle((190, -5), 50, 10,\
                        fill = False,
