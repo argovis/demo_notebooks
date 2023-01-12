@@ -96,7 +96,6 @@ def create_boxstr_for_query(longitude_west,longitude_east,latitude_south,latitud
         '], [' + str(longitude_east) + ',' + str(latitude_north) + \
         '], [' + str(longitude_east) + ',' + str(latitude_south) + \
         '], [' + str(longitude_west) + ',' + str(latitude_south) + ']]'
-    print(boxstr)
     return boxstr
 
 def query_grid_by_region_month_year(lattice_name,grid_name,region_str,levels, \
@@ -112,7 +111,6 @@ def query_grid_by_region_month_year(lattice_name,grid_name,region_str,levels, \
       "presRange": levels,
       "compression": 'array',
     }
-    print(params)
     data_raw = avh.query('grids/'+lattice_name, options=params, apikey=API_KEY, apiroot=API_PREFIX)
 
     #     #### this below is not needed since we have presRange specified now (hence the pressure levels are returned in data_raw)
@@ -156,32 +154,6 @@ def xargrid(grid, depths,long_conversion_type):
                            "pressure": pressure, 
                            "data": meas}).set_index(["latitude","longitude","time","pressure"])
     return df.to_xarray()
-
-# def xargrid(grid, depths):
-#     # given the json response <grid> of a request to /grids/{gridName} and a single gridded product,
-#     # a list <depths> of the corresponding depths for these grid documents
-#     # return an xarray object with coordinates time, lat, lon, depth, and measurement value.
-    
-#     lat = []
-#     lon = []
-#     time = []
-#     meas = []
-#     pressure = []
-#     for p in grid:
-#         for i, e in enumerate(p['data'][0]):
-#             lon.append(p['geolocation']['coordinates'][0])
-#             lat.append(p['geolocation']['coordinates'][1])
-#             time.append(avh.parsetime(p['timestamp']))
-#             meas.append(p['data'][0][i])
-#             pressure.append(depths[i])
-            
-#     df = pandas.DataFrame({"latitude": lat, 
-#                            "longitude": lon, 
-#                            "time": time, 
-#                            "pressure": pressure, 
-#                            "measurement": meas}).set_index(["latitude","longitude","time","pressure"])
-#     return df.to_xarray()
-
 
 def areaweighted_region_mean(dxr):
     # given an xarray dataset <grid> for a given depth and time,
