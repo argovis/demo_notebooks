@@ -8,7 +8,7 @@ import matplotlib.patches as patches
 # set up parameteres
 def def_activity_param(str_activity,region_selected,section_selected_lat,depth_level_selected,API_KEY,API_PREFIX):
     if str_activity == 'activity_enso':
-        dic = {'grid_name': 'temperature_rg', \
+        dic = {'grid_name': 'rg09_temperature', \
               'plot_title': 'Temperature, degC', \
               'region': def_reg_activity(str_region=region_selected), \
               'latitude_band_selected': def_zonal_section_activity(str_latitude=section_selected_lat), \
@@ -98,7 +98,7 @@ def create_boxstr_for_query(longitude_west,longitude_east,latitude_south,latitud
         '], [' + str(longitude_west) + ',' + str(latitude_south) + ']]'
     return boxstr
 
-def query_grid_by_region_month_year(grid_name,region_str,levels, \
+def query_grid_by_region_month_year(lattice_name,grid_name,region_str,levels, \
                                     long_conversion_type,\
                                     month_start,year_start,\
                                     month_end,year_end,\
@@ -111,9 +111,8 @@ def query_grid_by_region_month_year(grid_name,region_str,levels, \
       "presRange": levels,
       "compression": 'array',
     }
+    data_raw = avh.query('grids/'+lattice_name, options=params, apikey=API_KEY, apiroot=API_PREFIX)
 
-    data_raw = avh.query('grids/'+grid_name, options=params, apikey=API_KEY, apiroot=API_PREFIX)
-    
     #     #### this below is not needed since we have presRange specified now (hence the pressure levels are returned in data_raw)
 
     #     metadata_params = {
@@ -124,8 +123,7 @@ def query_grid_by_region_month_year(grid_name,region_str,levels, \
 
     #     data = {**metadata,**data_raw}
 
-    
-    return xargrid(grid=data_raw, depths=data_raw[0]['levels'],long_conversion_type=long_conversion_type)
+    return xargrid(grid=data_raw, depths=data_raw[0]['levels'][0],long_conversion_type=long_conversion_type)
 
 # process
 def xargrid(grid, depths,long_conversion_type):
@@ -139,7 +137,7 @@ def xargrid(grid, depths,long_conversion_type):
     meas = []
     pressure = []
     for p in grid:
-        for i, e in enumerate(p['data']):
+        for i, e in enumerate(p['data'][0]):
             bfr_lon = p['geolocation']['coordinates'][0];
             if long_conversion_type=='long20_380':
                 if bfr_lon < 20:
@@ -147,7 +145,7 @@ def xargrid(grid, depths,long_conversion_type):
             lon.append(bfr_lon)
             lat.append(p['geolocation']['coordinates'][1])
             time.append(avh.parsetime(p['timestamp']))
-            meas.append(p['data'][i][0])
+            meas.append(p['data'][0][i])
             pressure.append(depths[i])
             
     df = pandas.DataFrame({"latitude": lat, 
@@ -156,7 +154,6 @@ def xargrid(grid, depths,long_conversion_type):
                            "pressure": pressure, 
                            "data": meas}).set_index(["latitude","longitude","time","pressure"])
     return df.to_xarray()
-
 
 def areaweighted_region_mean(dxr):
     # given an xarray dataset <grid> for a given depth and time,
@@ -170,8 +167,9 @@ def areaweighted_region_mean(dxr):
 # visualization
 def run_activity_maps(activity,str_year):
     for year in activity[str_year]:
-        data = query_grid_by_region_month_year(grid_name=activity['grid_name'],\
-                                               region_str = create_boxstr_for_query(longitude_west=activity['region'][0],\
+        data = query_grid_by_region_month_year(lattice_name = 'grid_1_1_0.5_0.5',\
+                                            grid_name=activity['grid_name'],\
+                                            region_str = create_boxstr_for_query(longitude_west=activity['region'][0],\
                                                                                  longitude_east=activity['region'][1], \
                                                                                  latitude_south=activity['region'][2],\
                                                                                  latitude_north=activity['region'][3]), \
@@ -180,15 +178,15 @@ def run_activity_maps(activity,str_year):
                                             month_start=activity['month'],year_start=year,\
                                             month_end=activity['month'],year_end=year,\
                                             API_KEY=activity['apikey'],API_PREFIX=activity['apiroot'])
-
         plot_map_enso_activity(data=data["data"].mean(dim="time").mean(dim="pressure"),cf_levels=activity['cf_levels_maps'],\
                 ylim_bottom=activity['region'][2]+1,ylim_top=activity['region'][3]-1,\
                  plot_title=str(year) + ' ' + activity['plot_title'],font_size=activity['font_size_map'])
         
 def run_activity_sections(activity,str_year):
     for year in activity[str_year]:
-        data = query_grid_by_region_month_year(grid_name=activity['grid_name'],\
-                                               region_str = create_boxstr_for_query(longitude_west=activity['region'][0],\
+        data = query_grid_by_region_month_year(lattice_name = 'grid_1_1_0.5_0.5',\
+                                            grid_name=activity['grid_name'],\
+                                            region_str = create_boxstr_for_query(longitude_west=activity['region'][0],\
                                                                                  longitude_east=activity['region'][1], \
                                                                                  latitude_south=activity['region'][2],\
                                                                                  latitude_north=activity['region'][3]), \
@@ -201,7 +199,6 @@ def run_activity_sections(activity,str_year):
                      cf_levels=activity['cf_levels_sections'],\
                      cf_levels_line=activity['cf_levels_sections_line'],\
                      ylim_bottom=200,plot_title=str(year) + ' ' + activity['plot_title'],font_size=activity['font_size_section'])
-# print(data)
         
 def plot_section(data,xaxis,yaxis,cf_levels,cf_levels_line,ylim_bottom,plot_title,font_size):
     # just to fix bug
@@ -212,8 +209,8 @@ def plot_section(data,xaxis,yaxis,cf_levels,cf_levels_line,ylim_bottom,plot_titl
     data.plot.contourf(y="pressure",yincrease=False,aspect=2, size=6,levels=cf_levels)
     # data["data"].mean(dim="latitude").mean(dim="time")
     if len(cf_levels_line) != 0:
-#         plt.contour(data["longitude"],data["pressure"],data["data"].mean(dim="latitude").mean(dim="time").transpose(),\
-#                     levels=cf_levels_line)
+        # plt.contour(data["longitude"],data["pressure"],data["data"].mean(dim="latitude").mean(dim="time").transpose(),\
+        #             levels=cf_levels_line)
         plt.contour(xaxis,yaxis,data.transpose(),levels=cf_levels_line)
     plt.ylim(bottom=ylim_bottom)
     plt.rcParams['font.size'] = font_size

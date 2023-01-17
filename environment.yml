@@ -11,4 +11,4 @@ dependencies:
   - xarray
   - pip:
     - svgpath2mpl
-    - argovisHelpers==0.0.3
+    - argovisHelpers==0.0.5
