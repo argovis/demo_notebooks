@@ -29,7 +29,7 @@ def varrange(profiles, var):
     # given a list of profiles and a variable name,
     # return the globally min, max limits of that variable
     
-    data = [p['data'] for p in profiles]
+    data = [avh.data_inflate(p) for p in profiles]
     data = [j for sub in data for j in sub]
     data = [level[var] for level in data if var in level]
     return [min(data), max(data)]
@@ -41,9 +41,10 @@ def interpolate(profile, levels):
     
     data_names = ['pressure']
     interpolated_data = [levels]
-    for key in profile['data_keys']:
+    for key in profile['data_info'][0]:
         if '_argoqc' not in key and '_woceqc' not in key and key!='pressure':
-            finites = [(level['pressure'], level[key]) for level in profile['data'] if level['pressure'] is not None and level[key] is not None and not math.isnan(level['pressure']) and not math.isnan(level[key])]
+            lvl = avh.data_inflate(profile)
+            finites = [(level['pressure'], level[key]) for level in lvl if level['pressure'] is not None and level[key] is not None and not math.isnan(level['pressure']) and not math.isnan(level[key])]
             pressure = [x[0] for x in finites]
             data = [x[1] for x in finites]
             data_names.append(key)
@@ -129,7 +130,8 @@ def argo_heatmap(profiles, variable, interp_levels):
     ax.invert_yaxis()
     ax.set_xlabel('Timestamp')
     ax.set_ylabel('Pressure [mbar]')
-    fig.colorbar(pcm, label=variable + ' [' + profiles[0]['units'][variable]+']')
+    units = avh.units_inflate(profiles[0])
+    fig.colorbar(pcm, label=variable + ' [' + units[variable]+']')
     type(ax)
     
 def hurrplot(bracket_points, tc, argo, var,colorBefore,colorAfter, maxpress=150, line=False):
@@ -147,8 +149,8 @@ def hurrplot(bracket_points, tc, argo, var,colorBefore,colorAfter, maxpress=150,
     for i in bracket_points:
         colo = argo[i]
         hurrtime = avh.parsetime(tc[i]['timestamp'])
-        hurrspeed = tc[i]['data'][0]['wind']
-        hurrpress = tc[i]['data'][0]['surface_pressure']
+        hurrspeed = tc[i]['data'][0][0] # tc data is always packed speed then pressure
+        hurrpress = tc[i]['data'][1][0]
         hurrlon = tc[i]['geolocation']['coordinates'][0]
         hurrlat = tc[i]['geolocation']['coordinates'][1]
         annotation = 'Hurricane track longitude: ' + str(hurrlon) + '\nHurricane track latitude: ' + str(hurrlat) + \
@@ -156,14 +158,13 @@ def hurrplot(bracket_points, tc, argo, var,colorBefore,colorAfter, maxpress=150,
         '\nHurricane surface pressure [mb]: ' + str(hurrpress)
         np = 0
         for p in colo:
-            print(p['data_keys'])
             ptime = avh.parsetime(p['timestamp'])
             c = colorBefore
             if ptime > hurrtime:
                 c = colorAfter
             time2hurricane = str(hurrtime.replace(microsecond=0) - ptime.replace(microsecond=0))
-            pressure = [level[p['data_keys'].index('pressure')] for level in p['data']]
-            d = [level[p['data_keys'].index(var)] for level in p['data']]
+            pressure = p['data'][p['data_info'][0].index('pressure')]
+            d = p['data'][p['data_info'][0].index(var)]   
             cutoff = next((i for i,v in enumerate(pressure) if v>maxpress))-1
             psub = pressure[0:cutoff]
             dsub = d[0:cutoff]
@@ -192,15 +193,17 @@ def compare_plots(profile_list_1, var1, profile_list_2, var2):
     fig, ax1 = plt.subplots(figsize=(15, 10))
     markers = ['o', '^', 's', '*', 'x']
     for i, p in enumerate(profile_list_1):
-        pressures = [level['pressure'] for level in p['data']]
-        var = [level[var1] for level in p['data']]
+        pressures = p['data'][p['data_info'][0].index('pressure')]
+        var = p['data'][p['data_info'][0].index(var1)]  
         ax1.scatter(var, pressures, s=10, c='b', marker=markers[i%len(markers)], label=p['_id'] + ' / ' + var1)
     for i, p in enumerate(profile_list_2):
-        pressures = [level['pressure'] for level in p['data']]
-        var = [level[var2] for level in p['data']]
+        pressures = p['data'][p['data_info'][0].index('pressure')]
+        var = p['data'][p['data_info'][0].index(var2)]  
         ax1.scatter(var, pressures, s=10, c='r', marker=markers[i%len(markers)], label=p['_id'] + ' / ' + var2)
         
+    units1 = avh.units_inflate(profile_list_1[0])
+    units2 = avh.units_inflate(profile_list_2[0])
     ax1.invert_yaxis()
-    ax1.set_xlabel(var1 + ' [' + profile_list_1[0]['units'][var1] + '], ' + var2 + ' [' + profile_list_2[0]['units'][var2] + ']')
+    ax1.set_xlabel(var1 + ' [' + units1[var1] + '], ' + var2 + ' [' + units2[var2] + ']')
     ax1.set_ylabel('Pressure [dbar]')
     plt.legend(loc='upper left', frameon=False)
