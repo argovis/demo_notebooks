@@ -108,8 +108,7 @@ def query_grid_by_region_month_year(lattice_name,grid_name,region_str,levels, \
       "endDate": f'{year_end}'+'-'+f'{month_end:02}'+'-31T00:00:00Z',
       "polygon": region_str,
       "data": grid_name,
-      "presRange": levels,
-      "compression": 'array',
+      "presRange": levels
     }
     data_raw = avh.query('grids/'+lattice_name, options=params, apikey=API_KEY, apiroot=API_PREFIX)
 
@@ -123,7 +122,7 @@ def query_grid_by_region_month_year(lattice_name,grid_name,region_str,levels, \
 
     #     data = {**metadata,**data_raw}
 
-    return xargrid(grid=data_raw, depths=data_raw[0]['levels'][0],long_conversion_type=long_conversion_type)
+    return xargrid(grid=data_raw, depths=data_raw[0]['levels'],long_conversion_type=long_conversion_type)
 
 # process
 def xargrid(grid, depths,long_conversion_type):
@@ -167,7 +166,7 @@ def areaweighted_region_mean(dxr):
 # visualization
 def run_activity_maps(activity,str_year):
     for year in activity[str_year]:
-        data = query_grid_by_region_month_year(lattice_name = 'grid_1_1_0.5_0.5',\
+        data = query_grid_by_region_month_year(lattice_name = 'rg09',\
                                             grid_name=activity['grid_name'],\
                                             region_str = create_boxstr_for_query(longitude_west=activity['region'][0],\
                                                                                  longitude_east=activity['region'][1], \
@@ -184,7 +183,7 @@ def run_activity_maps(activity,str_year):
         
 def run_activity_sections(activity,str_year):
     for year in activity[str_year]:
-        data = query_grid_by_region_month_year(lattice_name = 'grid_1_1_0.5_0.5',\
+        data = query_grid_by_region_month_year(lattice_name = 'rg09',\
                                             grid_name=activity['grid_name'],\
                                             region_str = create_boxstr_for_query(longitude_west=activity['region'][0],\
                                                                                  longitude_east=activity['region'][1], \
