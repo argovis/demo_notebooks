@@ -8,7 +8,7 @@ dependencies:
   - pip
   - scipy
   - numpy
-  - xarray
+  - xarray>=2022.11.0
   - pip:
     - svgpath2mpl
     - argovisHelpers==0.0.3
