@@ -9,6 +9,7 @@ dependencies:
   - scipy=1.6.2
   - numpy=1.22.3
   - xarray=2022.11.0
+  - matplotlib=3.5.1
   - pip:
     - svgpath2mpl==1.0.0
     - argovisHelpers==0.0.9
