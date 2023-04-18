@@ -11,6 +11,7 @@ dependencies:
   - xarray=2022.11.0
   - matplotlib=3.5.1
   - shapely=1.7.1
+  - area=1.1.1
   - pip:
     - svgpath2mpl==1.0.0
-    - argovisHelpers==0.0.9
+    - argovisHelpers==0.0.10

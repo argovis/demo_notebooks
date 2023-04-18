@@ -95,7 +95,7 @@ def simple_map(longitudes, latitudes, z=None, polygon=None, title='', fig=None, 
         s = ax.scatter(longitudes, latitudes,transform=ccrs.PlateCarree(), s=100)
     
     if polygon:
-        plt.plot(polygon_lon_lat(polygon)['lon'],polygon_lon_lat(polygon)['lat'],'-k',linewidth=10,transform=ccrs.PlateCarree()) 
+        plt.plot(polygon_lon_lat(str(polygon))['lon'],polygon_lon_lat(str(polygon))['lat'],'-k',linewidth=10,transform=ccrs.PlateCarree()) 
     if marker:
         plt.plot(marker[0],marker[1],'Xr', transform=ccrs.PlateCarree(), markersize=20)
     if secondaries:

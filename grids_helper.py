@@ -91,11 +91,11 @@ def def_zonal_section_activity(str_latitude):
 
 # query
 def create_boxstr_for_query(longitude_west,longitude_east,latitude_south,latitude_north):
-    boxstr = '[[' + str(longitude_west) + ',' + str(latitude_south) + \
-        '], ['  + str(longitude_west) + ',' + str(latitude_north) + \
-        '], [' + str(longitude_east) + ',' + str(latitude_north) + \
-        '], [' + str(longitude_east) + ',' + str(latitude_south) + \
-        '], [' + str(longitude_west) + ',' + str(latitude_south) + ']]'
+    boxstr = [[longitude_west, latitude_south],
+              [longitude_west, latitude_north],
+              [longitude_east, latitude_north],
+              [longitude_east, latitude_south],
+              [longitude_west, latitude_south]]
     return boxstr
 
 def query_grid_by_region_month_year(lattice_name,grid_name,region_str,levels, \
