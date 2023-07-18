@@ -2,13 +2,15 @@ name: argovis_demos
 
 dependencies:
   - python=3.9
-  - requests
-  - cartopy
-  - pandas
-  - pip
-  - scipy
-  - numpy
-  - xarray
+  - requests=2.28.1
+  - cartopy=0.18.0
+  - pandas=1.4.2
+  - pip=23.0.1
+  - scipy=1.6.2
+  - numpy=1.22.3
+  - xarray=2022.11.0
+  - matplotlib=3.5.1
+  - shapely=1.7.1
   - pip:
-    - svgpath2mpl
+    - svgpath2mpl==1.0.0
     - argovisHelpers==0.0.12
