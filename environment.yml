@@ -14,3 +14,5 @@ dependencies:
   - pip:
     - svgpath2mpl==1.0.0
     - argovisHelpers==0.0.11
+    - geojson==3.0.1
+    - geopandas==0.14.0
