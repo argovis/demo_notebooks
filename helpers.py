@@ -79,8 +79,10 @@ def mapping_df(api_returns):
         
     return pandas.DataFrame(zip(longitudes,latitudes,timestamps), columns=['longitudes', 'latitudes', 'timestamps'])
 
-def level_df(api_returns, measurements):
-    # measurements list of valid measurement names from data_info[0]
+def level_df(api_returns, measurements, per_level_pressures=None):
+    # api_returns: list of data documents with data key included
+    # measurements: list of valid measurement names from data_info[0]
+    # per_level_pressure: list of 
     
     ## make flat lists of all requested variables, corresponding by index
     flat_meas = {}
@@ -89,9 +91,25 @@ def level_df(api_returns, measurements):
             flat_meas['months'] = [avh.parsetime(x['timestamp']).month for x in api_returns]
             flat_meas['months'] = [[flat_meas['months'][i]]*len(api_returns[i]['data'][0]) for i, x in enumerate(flat_meas['months'])]
             flat_meas['months'] = [item for sublist in flat_meas['months'] for item in sublist]
+        elif m == 'longitude':
+            flat_meas['longitude'] = [x['geolocation']['coordinates'][0] for x in api_returns]
+            flat_meas['longitude'] = [[flat_meas['longitude'][i]]*len(api_returns[i]['data'][0]) for i, x in enumerate(flat_meas['longitude'])]
+            flat_meas['longitude'] = [item for sublist in flat_meas['longitude'] for item in sublist]
+        elif m == 'latitude':
+            flat_meas['latitude'] = [x['geolocation']['coordinates'][1] for x in api_returns]
+            flat_meas['latitude'] = [[flat_meas['latitude'][i]]*len(api_returns[i]['data'][0]) for i, x in enumerate(flat_meas['latitude'])]
+            flat_meas['latitude'] = [item for sublist in flat_meas['latitude'] for item in sublist]
+        elif m == 'timestamp':
+            flat_meas['timestamp'] = [avh.parsetime(x['timestamp']) for x in api_returns]
+            flat_meas['timestamp'] = [[flat_meas['timestamp'][i]]*len(api_returns[i]['data'][0]) for i, x in enumerate(flat_meas['timestamp'])]
+            flat_meas['timestamp'] = [item for sublist in flat_meas['timestamp'] for item in sublist]
         else:
             flat_meas[m] = [x['data'][x['data_info'][0].index(m)] for x in api_returns]
             flat_meas[m] = [item for sublist in flat_meas[m] for item in sublist]
+    if per_level_pressures:
+        flat_meas['pressure'] = [per_level_pressures*len(api_returns)]
+        flat_meas['pressure'] = [item for sublist in flat_meas['pressure'] for item in sublist]
         
-    flat_meas = [flat_meas[key] for key in measurements]
-    return pandas.DataFrame(zip(*flat_meas), columns=measurements)
+    cols = flat_meas.keys()
+    flat_meas = [flat_meas[key] for key in flat_meas.keys()]
+    return pandas.DataFrame(zip(*flat_meas), columns=cols)
