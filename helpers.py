@@ -79,10 +79,12 @@ def mapping_df(api_returns):
         
     return pandas.DataFrame(zip(longitudes,latitudes,timestamps), columns=['longitudes', 'latitudes', 'timestamps'])
 
-def level_df(api_returns, measurements, per_level_pressures=None):
-    # api_returns: list of data documents with data key included
-    # measurements: list of valid measurement names from data_info[0]
-    # per_level_pressure: list of 
+def level_df(api_returns, measurements, per_level_pressures=None, index=None):
+    # api_returns: list of data documents
+    # measurements: list of valid measurement names from data_info[0] if data included; can also include 'latitude', 'longitude', 'timestamp' and 'months'
+    # per_level_pressure: list of pressures, per what's found on a gridded product's metadata
+    # index: subset list of measurements to turn into dataframe index
+    # returns a dataframe with one column for everything in measurements, and one row for every level in every document in api_returns
     
     ## make flat lists of all requested variables, corresponding by index
     flat_meas = {}
@@ -112,4 +114,22 @@ def level_df(api_returns, measurements, per_level_pressures=None):
         
     cols = flat_meas.keys()
     flat_meas = [flat_meas[key] for key in flat_meas.keys()]
-    return pandas.DataFrame(zip(*flat_meas), columns=cols)
+    df = pandas.DataFrame(zip(*flat_meas), columns=cols)
+    if index:
+        df = df.set_index(index)
+    return df
+
+def regional_mean(dxr, form='area'):
+    # given an xarray dataset <dxr> with latitudes and longitudes as dimensions,
+    # calculate the mean of all data variables, weighted by grid cell area
+    weights = numpy.cos(numpy.deg2rad(dxr.latitude))
+    weights.name = "weights"
+    dxr_weighted = dxr.weighted(weights)
+    
+    if form =='area':
+        return dxr_weighted.mean(("longitude", "latitude"))
+    elif form == 'meridional':
+        return dxr_weighted.mean(("latitude"))
+    elif form == 'zonal':
+        return dxr_weighted.mean(("longitude"))
+    
