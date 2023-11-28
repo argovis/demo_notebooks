@@ -4,7 +4,15 @@ import cartopy.feature as cfeature
 import random, numpy, pandas, matplotlib
 from argovisHelpers import helpers as avh
 
-def simple_map(longitudes, latitudes, z=None, markers=None, polygon=None, title='', fig=None, figIndex=None, spot=None, suppress_colorbar=False):
+def polygon_lon_lat(polygon_str):
+    # polygon_str: string value of polygon search parameter, ie "[[lon0,lat0],[lon1,lat1],...,[lon0,lat0]]"
+    # convert the polygon shape to lon and lat and save in a dictionary
+    polygon_lon_lat_dict = {'lon': [float(i) for i in ((polygon_str.replace('[','')).replace(']','')).split(',')[0::2]], \
+                    'lat': [float(i) for i in ((polygon_str.replace('[','')).replace(']','')).split(',')[1::2]]
+                   }
+    return polygon_lon_lat_dict
+
+def simple_map(longitudes, latitudes, z=None, zlabel=None, markers=None, polygon=None, title='', fig=None, figIndex=None, spot=None, suppress_colorbar=False, font_size=20):
     if fig:
         ax = fig.add_subplot(figIndex[0], figIndex[1], figIndex[2], projection=ccrs.LambertConformal())
     else:
@@ -14,7 +22,9 @@ def simple_map(longitudes, latitudes, z=None, markers=None, polygon=None, title=
     if z:
         s = ax.scatter(longitudes, latitudes, c=z, transform=ccrs.PlateCarree())
         if not suppress_colorbar:
-            plt.colorbar(s, pad=0.1)
+            cb = plt.colorbar(s, pad=0.1)
+            if zlabel:
+                cb.set_label(zlabel, rotation=270, labelpad=20, size=font_size)
     elif markers:
         lons = numpy.array(longitudes)
         lats = numpy.array(latitudes)
@@ -25,13 +35,14 @@ def simple_map(longitudes, latitudes, z=None, markers=None, polygon=None, title=
     else:
         s = ax.scatter(longitudes, latitudes,transform=ccrs.PlateCarree())
     if polygon:
-        plt.plot(polygon_lon_lat(str(polygon))['lon'],polygon_lon_lat(str(polygon))['lat'],'-k',transform=ccrs.PlateCarree()) 
+        plt.plot(polygon_lon_lat(str(polygon))['lon'],polygon_lon_lat(str(polygon))['lat'],'-k',transform=ccrs.PlateCarree(), linewidth=5, color='red') 
     if spot:
         plt.plot(spot[0],spot[1],'Xr', transform=ccrs.PlateCarree(), markersize=20)
+    plt.rcParams['font.size'] = font_size
     ax.add_feature(cfeature.COASTLINE)
     ax.add_feature(cfeature.BORDERS)
     ax.add_feature(cfeature.LAND)
-    plt.title(title, fontdict={'fontsize':20})
+    plt.title(title, fontdict={'fontsize':font_size})
     
 def random_color():
     return "#"+''.join([random.choice('0123456789ABCDEF') for j in range(6)])
