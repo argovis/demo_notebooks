@@ -12,7 +12,7 @@ def polygon_lon_lat(polygon_str):
                    }
     return polygon_lon_lat_dict
 
-def simple_map(longitudes, latitudes, z=None, zlabel=None, markers=None, polygon=None, title='', fig=None, figIndex=None, spot=None, suppress_colorbar=False, font_size=20):
+def simple_map(longitudes, latitudes, z=None, zlabel=None, markers=None, polygon=None, title='', fig=None, figIndex=None, spot=None, suppress_colorbar=False, font_size=20, secondaries=None):
     if fig:
         ax = fig.add_subplot(figIndex[0], figIndex[1], figIndex[2], projection=ccrs.LambertConformal())
     else:
@@ -35,7 +35,10 @@ def simple_map(longitudes, latitudes, z=None, zlabel=None, markers=None, polygon
     else:
         s = ax.scatter(longitudes, latitudes,transform=ccrs.PlateCarree())
     if polygon:
-        plt.plot(polygon_lon_lat(str(polygon))['lon'],polygon_lon_lat(str(polygon))['lat'],'-k',transform=ccrs.PlateCarree(), linewidth=5, color='red') 
+        plt.plot(polygon_lon_lat(str(polygon))['lon'],polygon_lon_lat(str(polygon))['lat'],'-k',transform=ccrs.PlateCarree(), linewidth=5, color='red')
+    if secondaries:
+        for sec in secondaries:
+            ax.scatter(sec['lon'], sec['lat'],transform=ccrs.PlateCarree(), color=sec['color'], marker='x', s=150, linewidth=3)
     if spot:
         plt.plot(spot[0],spot[1],'Xr', transform=ccrs.PlateCarree(), markersize=20)
     plt.rcParams['font.size'] = font_size
