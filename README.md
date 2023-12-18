@@ -2,9 +2,8 @@
 
 # Argovis Demo Notebooks
 
-> **This is a beta product!**
-> Argovis' new API is currently undergoing heavy development. Therefore, everything in these notebooks should be understood as a technical preview only; implementation details may change before a 
-stable release is made. Please send feedback and ideas to argovis@colorado.edu.
+This repository contains notebooks meant to be followed by individuals who want to learn more about searching, downloading and processing data with Argovis. Start with [Intro to 
+Argovis](https://github.com/argovis/demo_notebooks/blob/main/Intro_to_Argovis.ipynb), and then follow along with any other notebooks that are relevant to your interests.
 
 ## See Also
 
