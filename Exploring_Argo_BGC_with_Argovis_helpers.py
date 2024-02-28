@@ -48,8 +48,13 @@ def interpolate(profile, levels):
             pressure = [x[0] for x in finites]
             data = [x[1] for x in finites]
             data_names.append(key)
-            levels_in_range = [x for x in levels if x<pressure[-1]]
-            interpolated_data.append(padlist(scipy.interpolate.pchip_interpolate(pressure, data, levels_in_range), len(levels), np.nan ) )
+            
+            #levels_in_range = [x for x in levels if x<pressure[-1]]
+            levels_in_range = levels
+            #interpolated_data.append(padlist(scipy.interpolate.pchip_interpolate(pressure, data, levels_in_range), len(levels), np.nan ) )
+            
+            # interpolate avoiding extrapolation
+            interpolated_data.append(scipy.interpolate.PchipInterpolator(pressure, data, extrapolate=False)(levels_in_range).tolist())
     
     interpolated_levels = list(zip(*interpolated_data))
     data = [{data_names[i]:d[i] for i in range(len(data_names))} for d in interpolated_levels]
