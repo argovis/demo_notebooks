@@ -3,6 +3,31 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import random, numpy, pandas, matplotlib
 from argovisHelpers import helpers as avh
+import xarray as xr
+
+def grids_to_xarray(grids,grids_meta):
+    data_list        = []
+    data_list_lev    = []
+    data_list_lon    = []
+    data_list_lat    = []
+    data_list_tstamp = []
+    for x in grids:
+        for ix,x_at_lev in enumerate(x['data'][0]):
+            data_list.append(x_at_lev)
+            data_list_lev.append(grids_meta[0]['levels'][ix])
+            data_list_lon.append(x['geolocation']['coordinates'][0])
+            data_list_lat.append(x['geolocation']['coordinates'][1])
+            data_list_tstamp.append(x['timestamp'])
+    bfr_lon = numpy.array(data_list_lon)
+    bfr_lon[bfr_lon<20] = bfr_lon[bfr_lon<20]+360
+
+    data_list_lon = bfr_lon.tolist()
+
+    data_dict = {'data': data_list,'latitude':data_list_lat, 'longitude': data_list_lon,'levels': data_list_lev} 
+
+    data_df = pandas.DataFrame(data_dict)   
+    df_rows = pandas.DataFrame(data_df).set_index(["latitude", "longitude","levels" ])
+    return xr.Dataset.from_dataframe(df_rows)
 
 def polygon_lon_lat(polygon_str):
     # polygon_str: string value of polygon search parameter, ie "[[lon0,lat0],[lon1,lat1],...,[lon0,lat0]]"
