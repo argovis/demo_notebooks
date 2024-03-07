@@ -12,12 +12,23 @@ def grids_to_xarray(grids,grids_meta):
     data_list_lat    = []
     data_list_tstamp = []
     for x in grids:
-        for ix,x_at_lev in enumerate(x['data'][0]):
-            data_list.append(x_at_lev)
-            data_list_lev.append(grids_meta[0]['levels'][ix])
+#         for ix,x_at_lev in enumerate(x['data'][0]):
+#             data_list.append(x_at_lev)
+#             data_list_lev.append(grids_meta[0]['levels'][ix])
+#             data_list_lon.append(x['geolocation']['coordinates'][0])
+#             data_list_lat.append(x['geolocation']['coordinates'][1])
+#             data_list_tstamp.append(x['timestamp'])
+        for ix,x_lev in enumerate(grids_meta[0]['levels']):
+            if ix <= len(x['data'][0])-1:
+                data_list.append(x['data'][0][ix])
+            else:
+                data_list.append(numpy.nan)
+                
+            data_list_lev.append(x_lev)
             data_list_lon.append(x['geolocation']['coordinates'][0])
             data_list_lat.append(x['geolocation']['coordinates'][1])
             data_list_tstamp.append(x['timestamp'])
+            
     bfr_lon = numpy.array(data_list_lon)
     bfr_lon[bfr_lon<20] = bfr_lon[bfr_lon<20]+360
 
