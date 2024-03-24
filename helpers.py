@@ -169,6 +169,10 @@ def level_df(api_returns, measurements, per_level_pressures=None, timesteps=None
             flat_meas['id'] = [x['_id'] for x in api_returns]
             flat_meas['id'] = [[flat_meas['id'][i]]*len(api_returns[i]['data'][0]) for i, x in enumerate(flat_meas['id'])]
             flat_meas['id'] = [item for sublist in flat_meas['id'] for item in sublist]
+        elif m == 'level':
+            flat_meas['level'] = [x['level'] for x in api_returns]
+            flat_meas['level'] = [[flat_meas['level'][i]]*len(api_returns[i]['data'][0]) for i, x in enumerate(flat_meas['level'])]
+            flat_meas['level'] = [item for sublist in flat_meas['level'] for item in sublist]
         else:
             flat_meas[m] = [x['data'][x['data_info'][0].index(m)] for x in api_returns]
             flat_meas[m] = [item for sublist in flat_meas[m] for item in sublist]
