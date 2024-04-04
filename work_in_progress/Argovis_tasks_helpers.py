@@ -1,17 +1,19 @@
+import random, pandas, matplotlib, math, copy
+import scipy.interpolate
+import numpy as np
+
 import matplotlib.pyplot as plt
+
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import cartopy.mpl.ticker as cticker
 
-import random, pandas, matplotlib, math, copy
-import scipy.interpolate
-
-import numpy as np
-
+import dateutil
 
 from argovisHelpers import helpers as avh
 import xarray as xr
 
+# get the correct route, given the collection name
 def get_route(collection_name):
     
     if collection_name == 'drifters':
@@ -19,6 +21,7 @@ def get_route(collection_name):
     else:
         return 'https://argovis-api.colorado.edu/'
     
+# interpolate profiles (this can be used also for grids/, as they are stored as profiles
 def interpolate_profiles(profile, levels_varname, levels_new):
     # given a <profile>, a string for the name <levels_varname> of the variable containing the levels, and a list of desired values for vertical levels <levels_new>,
     # return a profile with profile.data levels at the desired vertical levels, with all available data interpolated to match
@@ -51,6 +54,7 @@ def interpolate_profiles(profile, levels_varname, levels_new):
         interpolated_profile['data_warnings'] = ['data_interpolated']
     return interpolated_profile
 
+# create an xarray from grids/ output (the output of grids_meta is also needed)
 def grids_to_xarray(grids,grids_meta):
     data_list        = []
     data_list_lev    = []
@@ -79,10 +83,11 @@ def grids_to_xarray(grids,grids_meta):
     data_df = pandas.DataFrame(data_dict)   
     df_rows = pandas.DataFrame(data_df).set_index(["latitude", "longitude","levels","timestamp"])
     return xr.Dataset.from_dataframe(df_rows)
-    
+
+# area weigthed regional mean starting from an xarray
 def xarray_regional_mean(dxr, form='area'):
     # given an xarray dataset <dxr> with latitudes and longitudes as dimensions,
-    # calculate the mean of all data variables, weighted by grid cell area
+    # calculate the horizontal average of all data variables, weighted by grid cell area
     weights = np.cos(np.deg2rad(dxr.latitude))
     weights.name = "weights"
     dxr_weighted = dxr.weighted(weights)
@@ -93,7 +98,8 @@ def xarray_regional_mean(dxr, form='area'):
         return dxr_weighted.mean(("latitude"))
     elif form == 'zonal':
         return dxr_weighted.mean(("longitude"))
-    
+
+# create a map from lists of longitudes and latitudes    
 def map_lons_lats(lons,lats,dx=20,dy=20):
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
@@ -103,7 +109,7 @@ def map_lons_lats(lons,lats,dx=20,dy=20):
     if np.floor(min(lons))>=-180 and min(lon_range)<-180:
         lon_range=lon_range[lon_range>=-180]
     if np.floor(max(lons))<=180 and max(lon_range)>180:
-        lon_range=lon_range[long_range<=180]
+        lon_range=lon_range[lon_range<=180]
     
 
     ax.set_extent([min(lon_range), max(lon_range), min(lat_range), max(lat_range)], crs=ccrs.PlateCarree())
@@ -117,3 +123,102 @@ def map_lons_lats(lons,lats,dx=20,dy=20):
     ax.set_yticks(lat_range, crs=ccrs.PlateCarree())
     lat_formatter = cticker.LatitudeFormatter()
     ax.yaxis.set_major_formatter(lat_formatter)
+
+# get profiles and perform horizontal ave, given a list of regions of interest, collections, and other info
+def get_profiles_in_regions_and_horiz_ave(collections,varname,varname_qc,varname_levels,interp_levels,regions_list_source,regions_list_source_type,regions_list_source_tags,startDate,endDate,API_KEY=''):
+    # input:
+    # collections: list of collections of interest, e.g. ['argo', 'grids/glodap'] or ['argo', 'grids/rg09']. Please note, these collections should include profiles (e.g. grids/ are stored as profiles, this is different for BSOSE)
+    # varname: list with the names of the variable of interest for each of the collections, e.g. ['doxy', 'oxygen']
+    # varname_qc: list with the qc values of the variable of interest for each of the collections, e.g. [',1', '']
+    # varname_levels: list with the names of the variable with vertical levels for each of the collections (for the grids route, this should be ''), e.g. ['pressure','']
+    # interp_levels: list with the levels to use for the vertical interpolation, e.g. list(range(10,2001))[0::20]
+    # regions_list_source: a list of regions to be used in the 'box' or 'polygon' searches (if empty [], no region is specified in the API query), e.g. for 'box' one possibility (including two regions) is [ [[-179.5,45.5],[-170.5,50.5]], [[-50,45],[-40,50]] ]
+    # regions_list_source_type: 'box' or 'polygon' depending on what regions_list is
+    # API_KEY: string with API_KEY or ''
+    #
+    # notes: the time range does not apply to glodap as for that product only the time mean is available
+    output_vars = ['regions_list_data_raw', 'regions_list_data_raw_xarray', 'regions_list_data_vert_interp', 'regions_list_data_horiz_ave', 'regions_list_data_horiz_ave_levels', 'regions_list_data_time', 'regions_list', 'regions_list_collections', 'regions_list_tags']
+    
+    for ivar in output_vars:
+        globals()[ivar] = []
+    
+    ############ Get the data for each of the regions of interest, for each collection
+    for iiireg,ireg in enumerate(regions_list_source):
+        for icol_ind,icollection in enumerate(collections):
+            # print and store the region and collection for each item in the output lists
+            print('Region '+str(ireg)+' , '+icollection+' collection')
+            regions_list.append(ireg)
+            regions_list_collections.append(icollection)
+            regions_list_tags.append(regions_list_source_tags[iiireg])
+            ###### get profiles of interest using Argovis API (query based on qc if requested above for a collection)
+            iparam = {'data': varname[icol_ind]+varname_qc[icol_ind]}
+            
+            # if provided, search in a region of interest
+            if ireg and (regions_list_source_type=='box' or regions_list_source_type=='polygon'):
+                iparam[regions_list_source_type] = ireg
+                
+            # the time range does not apply to glodap as only the time mean is available for glodap
+            if 'glodap' in icollection:
+                print('For the glodap product, only the time mean is available')
+            else:
+                iparam['startDate'] = startDate
+                iparam['endDate']   = endDate
+            api_output = avh.query(icollection, options=iparam, verbose='true',apikey=API_KEY, apiroot=get_route(icollection)) 
+
+            ###### store data as is and interpolated
+            if api_output: # len(api_output)>0
+                ## interpolate profiles (if not from a grid)   
+                interpolated_profiles      = []
+                timestamps                 = []
+                lons                       = []
+                lats                       = []
+                for i in list(range(0,len(api_output)-1)):
+                    if len(api_output[i]['data'][0]) > 1:
+                        if 'grids' not in icollection:
+                            interpolated_profiles.append(interpolate_profiles(profile=api_output[i],levels_varname=varname_levels[icol_ind],levels_new=interp_levels))
+                        timestamps.append(dateutil.parser.isoparse(api_output[i]['timestamp'])) 
+                        lons.append(api_output[i]['geolocation']['coordinates'][0])
+                        lats.append(api_output[i]['geolocation']['coordinates'][1])
+                
+                # store what is needed for profile data
+                if 'grids' not in icollection:
+                    # shape variable into something appropriate
+                    data = [x['data'] for x in interpolated_profiles]
+                    data = [[level[varname[icol_ind]] for level in x] for x in data]
+                    # store interpolated profiles
+                    regions_list_data_vert_interp.append(data)
+                    data = np.transpose(data)
+                    regions_list_data_horiz_ave.append(np.nanmean(data,1))
+                    regions_list_data_horiz_ave_levels.append(interp_levels)
+                    regions_list_data_raw_xarray.append([])
+                    regions_list_data_raw.append([x['data'] for x in api_output])
+                    ## quick plot of profiles in region
+                    map_lons_lats(lons,lats,dx=20,dy=20)
+
+                ## store timestamp
+                regions_list_data_time.append(timestamps)
+
+                # store what is needed for grids
+                if 'grids' in icollection:
+
+                    grids_opt  = {
+                                "id": api_output[0]['metadata'][0]
+                                }
+                    grids_meta = avh.query('grids/meta', options=grids_opt, verbose='true',apikey=API_KEY, apiroot=get_route(icollection))
+
+                    xar = grids_to_xarray(api_output,grids_meta)
+                    # store data
+                    regions_list_data_vert_interp.append([]) # no need to interpolate for grids
+                    regions_list_data_raw_xarray.append(xar)
+                    xar_h_ave = xarray_regional_mean(xar)['data'].mean(axis=1).values.flatten()
+                    regions_list_data_horiz_ave.append(xar_h_ave)
+                    regions_list_data_horiz_ave_levels.append(grids_meta[0]['levels'][0:len(xar_h_ave)])
+                    regions_list_data_raw.append([[x['data'][0],grids_meta[0]['levels'][0:len(x['data'][0])]] for x in api_output])
+
+                    # to see some info about the grid (including the units of the vertical level variable)
+                    grids_meta
+                    
+    output = {}
+    for ivar in output_vars:
+        output[ivar] = globals()[ivar]
+    return output
