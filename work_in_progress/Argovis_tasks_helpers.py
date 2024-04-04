@@ -1,8 +1,13 @@
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-import random, numpy, pandas, matplotlib, math, copy
+import cartopy.mpl.ticker as cticker
+
+import random, pandas, matplotlib, math, copy
 import scipy.interpolate
+
+import numpy as np
+
 
 from argovisHelpers import helpers as avh
 import xarray as xr
@@ -57,14 +62,14 @@ def grids_to_xarray(grids,grids_meta):
             if ix <= len(x['data'][0])-1:
                 data_list.append(x['data'][0][ix])
             else:
-                data_list.append(numpy.nan)
+                data_list.append(np.nan)
                 
             data_list_lev.append(x_lev)
             data_list_lon.append(x['geolocation']['coordinates'][0])
             data_list_lat.append(x['geolocation']['coordinates'][1])
             data_list_tstamp.append(x['timestamp'])
             
-    bfr_lon = numpy.array(data_list_lon)
+    bfr_lon = np.array(data_list_lon)
     bfr_lon[bfr_lon<20] = bfr_lon[bfr_lon<20]+360
 
     data_list_lon = bfr_lon.tolist()
@@ -78,7 +83,7 @@ def grids_to_xarray(grids,grids_meta):
 def xarray_regional_mean(dxr, form='area'):
     # given an xarray dataset <dxr> with latitudes and longitudes as dimensions,
     # calculate the mean of all data variables, weighted by grid cell area
-    weights = numpy.cos(numpy.deg2rad(dxr.latitude))
+    weights = np.cos(np.deg2rad(dxr.latitude))
     weights.name = "weights"
     dxr_weighted = dxr.weighted(weights)
     
@@ -89,3 +94,26 @@ def xarray_regional_mean(dxr, form='area'):
     elif form == 'zonal':
         return dxr_weighted.mean(("longitude"))
     
+def map_lons_lats(lons,lats,dx=20,dy=20):
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+    lon_range = np.arange(np.floor(min(lons))-dx,np.ceil(max(lons))+dx,10)
+    lat_range = np.arange(np.floor(min(lats))-dy,np.ceil(max(lats))+dy,10)
+    
+    if np.floor(min(lons))>=-180 and min(lon_range)<-180:
+        lon_range=lon_range[lon_range>=-180]
+    if np.floor(max(lons))<=180 and max(lon_range)>180:
+        lon_range=lon_range[long_range<=180]
+    
+
+    ax.set_extent([min(lon_range), max(lon_range), min(lat_range), max(lat_range)], crs=ccrs.PlateCarree())
+
+    # Put a background image on for nice sea rendering.
+    ax.stock_img()
+    ax.plot(lons,lats,marker='.',linestyle='none',color='k')
+    ax.set_xticks(lon_range, crs=ccrs.PlateCarree())
+    lon_formatter = cticker.LongitudeFormatter()
+    ax.xaxis.set_major_formatter(lon_formatter)
+    ax.set_yticks(lat_range, crs=ccrs.PlateCarree())
+    lat_formatter = cticker.LatitudeFormatter()
+    ax.yaxis.set_major_formatter(lat_formatter)
