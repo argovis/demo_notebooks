@@ -146,7 +146,7 @@ def get_profiles_in_regions_and_horiz_ave(collections,varname,varname_qc,varname
     for iiireg,ireg in enumerate(regions_list_source):
         for icol_ind,icollection in enumerate(collections):
             # print and store the region and collection for each item in the output lists
-            print('Region '+str(ireg)+' , '+icollection+' collection')
+            print('>>>>>>> Region '+str(ireg)+' , '+icollection+' collection')
             regions_list.append(ireg)
             regions_list_collections.append(icollection)
             regions_list_tags.append(regions_list_source_tags[iiireg])
@@ -222,3 +222,80 @@ def get_profiles_in_regions_and_horiz_ave(collections,varname,varname_qc,varname
     for ivar in output_vars:
         output[ivar] = globals()[ivar]
     return output
+
+# function to plot the output of get_profiles_in_regions_and_horiz_ave: plot the horizontal average for (vertically) interpolated profiles and for the gridded product
+# input:
+# data_reg: output of the function get_preofiles_in_regions_and_horiz_ave
+# data_reg_cols     = ['k', 'b', 'r', 'm']
+# xlabel_tag        = 'Salinity, psu'
+def profiles_in_regions_and_horiz_ave_plot1d_horiz_ave(data_reg,data_reg_cols,xlabel_tag):
+    plt.figure(figsize=(10,8))
+    for i,idata in enumerate(data_reg['regions_list_data_horiz_ave']):
+        plt.plot(idata,data_reg['regions_list_data_horiz_ave_levels'][i],color=data_reg_cols[i],linewidth=3)
+    plt.gca().invert_yaxis()
+    plt.ylabel('Vertical level (m or dbar)',size=16)
+    plt.xlabel(xlabel_tag,size=16)
+    plt.legend([a_+', '+b_ for a_, b_ in zip(data_reg['regions_list_tags'],data_reg['regions_list_collections'])])
+
+# function to plot the output of get_profiles_in_regions_and_horiz_ave: let's look at all the raw profiles that were vertically interpolated (except for the gridded products) to then compute the horizontal average above
+# input:
+# data_reg: output of the function get_preofiles_in_regions_and_horiz_ave
+# data_reg_cols     = ['k', 'b', 'r', 'm']
+# xlabel_tag        = 'Salinity, psu'
+def profiles_in_regions_and_horiz_ave_plot1d_all(data_reg,data_reg_cols,xlabel_tag):
+    plt.figure(figsize=(15,8))
+    for i,idata in enumerate(data_reg['regions_list_data_raw']):
+        plt.subplot(1,len(data_reg['regions_list_data_horiz_ave']),i+1)    
+        for iidata in idata:
+            plt.plot(iidata[0],iidata[1],color=data_reg_cols[i])
+        plt.gca().invert_yaxis()
+        if i==0:
+            plt.ylabel('Vertical level (m or dbar)',size=16)
+        plt.title(data_reg['regions_list_tags'][i]+', '+data_reg['regions_list_collections'][i])
+        plt.xlabel(xlabel_tag,size=16)
+
+# function to plot the output of get_profiles_in_regions_and_horiz_ave: let's look at all the vertically interpolated profiles that were used to compute the horizontal average above
+# input:
+# data_reg: output of the function get_preofiles_in_regions_and_horiz_ave
+# data_reg_cols     = ['k', 'b', 'r', 'm']
+# xlabel_tag        = 'Salinity, psu'
+def profiles_in_regions_and_horiz_ave_plot1d_all_vert_interp(data_reg,data_reg_cols,xlabel_tag):
+    plt.figure(figsize=(15,8))
+    for i,idata in enumerate(data_reg['regions_list_data_vert_interp']):
+        if idata:
+            plt.subplot(1,len(data_reg['regions_list_data_horiz_ave']),i+1)    
+            for iidata in idata:
+                plt.plot(iidata,data_reg['regions_list_data_horiz_ave_levels'][i],color=data_reg_cols[i])
+            plt.gca().invert_yaxis()
+            if i==0:
+                plt.ylabel('Vertical level (m or dbar)',size=16)
+            plt.title(data_reg['regions_list_tags'][i]+', '+data_reg['regions_list_collections'][i]+' (interpolated)')
+            plt.xlabel(xlabel_tag,size=16)
+
+# function to plot the output of get_profiles_in_regions_and_horiz_ave: for each product, plot the raw profiles color coded by month/group of months of the year
+# input:
+# data_reg: output of the function get_preofiles_in_regions_and_horiz_ave
+# month_groups      = [[12, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]]
+# month_groups_cols = ['dodgerblue', 'violet', 'orangered', 'gold']
+# month_groups_tags = ['DJF', 'MAM', 'JJA', 'SON']
+# xlabel_tag        = 'Salinity, psu'
+def profiles_in_regions_and_horiz_ave_plot1d_all_col_by_monthgroup(data_reg,month_groups,month_groups_cols,month_groups_tags,xlabel_tag):
+    fig = plt.figure(figsize=(15,8))
+    for i,idata in enumerate(data_reg['regions_list_data_raw']):
+        itime = data_reg['regions_list_data_time'][i]
+
+        plt.subplot(1,len(data_reg['regions_list_data_horiz_ave']),i+1)    
+        for ii,iidata in enumerate(idata):
+            for imm,mm in enumerate(month_groups):
+                if ii<=len(itime)-1 and itime[ii].month in mm:
+                    plt.plot(iidata[0],iidata[1],color=month_groups_cols[imm])
+                    # glodap is a time mean
+                    if 'glodap' in data_reg['regions_list_collections'][i]:
+                        plt.plot(iidata[0],iidata[1],color='k')
+        plt.gca().invert_yaxis()
+        if i==0:
+            plt.ylabel('Vertical level (m or dbar)',size=16)
+        plt.title(data_reg['regions_list_tags'][i]+', '+data_reg['regions_list_collections'][i])
+        plt.xlabel(xlabel_tag,size=16)
+    for i,ileg in enumerate(month_groups_tags):
+        text = fig.text(0.5+((i-1)*(1/len(month_groups_cols)/3)), 0.02,ileg,horizontalalignment='center', wrap=True,color=month_groups_cols[i],size=16) 
