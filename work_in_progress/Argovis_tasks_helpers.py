@@ -188,12 +188,20 @@ def format_api_output(api_output,selection_params,varname,index_collection,API_K
                 api_output_formatted['data_xarray'] = xar
         elif 'grids' in selection_params['collections'][index_collection]:
                 # for grids, we only create data_xarray
-                grids_opt  = {
-                            "id": api_output[0]['metadata'][0]
-                            }
-                grids_meta = avh.query('grids/meta', options=grids_opt, verbose='true',apikey=API_KEY, apiroot=get_route(selection_params['collections'][index_collection]))
                        
-                api_output_formatted['data_units'] = grids_meta[0]['data_info'][2][grids_meta[0]['data_info'][0].index(varname)][0] 
+                for igm in api_output[0]['metadata']:
+                    try:
+                        # look in different meta_data documents until you find the one that has units for the variable of interest
+                        grids_opt  = {
+                            "id": igm
+                            }
+                        grids_meta = avh.query('grids/meta',options=grids_opt,verbose='true', apikey=API_KEY, apiroot=get_route(selection_params['collections'][index_collection]))
+                        api_output_formatted['data_units'] = grids_meta[0]['data_info'][2][grids_meta[0]['data_info'][0].index(varname)][0] 
+                        
+                    except:
+                        igm
+#                         print(grids_meta['data_info'][0])
+#                         print(grids_meta['data_info'][2])
                 
                 api_output_formatted['data_xarray'] = grids_to_xarray(api_output,grids_meta,varname)
                 
