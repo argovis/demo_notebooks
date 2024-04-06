@@ -20,6 +20,19 @@ def get_route(collection_name):
         return 'https://argovisbeta01.colorado.edu/dapi/'
     else:
         return 'https://argovis-api.colorado.edu/'
+
+######## show list of variables for each collection in list
+def show_variable_names_for_collections(collections_list,API_KEY):
+    for icollection in collections_list:
+        try:
+            print(avh.query(icollection+'/vocabulary', options={'parameter': 'data'}, verbose='true',apikey=API_KEY, apiroot=get_route(icollection)) )
+        except:
+            print('No data parameter for vocabulary query')
+        try:
+            bfr = avh.query(icollection+'/vocabulary', verbose='true',apikey=API_KEY, apiroot=get_route(icollection))
+            print(*bfr[0]['data'],sep=',')
+        except:
+            print('Needs data parameter for vocabulary query')
     
 # interpolate profiles (this can be used also for grids/, as they are stored as profiles
 def interpolate_profiles(profile, levels_varname, levels_new):
@@ -55,7 +68,8 @@ def interpolate_profiles(profile, levels_varname, levels_new):
     return interpolated_profile
 
 # create an xarray from grids/ output (the output of grids_meta is also needed)
-def grids_to_xarray(grids,grids_meta):
+# varname indicates what variable to store in the xarray
+def grids_to_xarray(grids,grids_meta,varname):
     data_list        = []
     data_list_lev    = []
     data_list_lon    = []
@@ -63,8 +77,8 @@ def grids_to_xarray(grids,grids_meta):
     data_list_tstamp = []
     for x in grids:
         for ix,x_lev in enumerate(grids_meta[0]['levels']):
-            if ix <= len(x['data'][0])-1:
-                data_list.append(x['data'][0][ix])
+            if ix <= len(x['data'][x['data_info'][0].index(varname)])-1:
+                data_list.append(x['data'][x['data_info'][0].index(varname)][ix])
             else:
                 data_list.append(np.nan)
                 
@@ -124,73 +138,39 @@ def map_lons_lats(lons,lats,dx=20,dy=20):
     lat_formatter = cticker.LatitudeFormatter()
     ax.yaxis.set_major_formatter(lat_formatter)
 
-# function to get a list of formatted api output
-def get_api_output_formatted_list(selection_params,API_KEY):
-
-    api_output_formatted_list = []
-
-    for icl,icollection in enumerate(selection_params['collections']):
-        for i,ireg in enumerate(selection_params['regions']):
-            for istart,iend in zip(selection_params['startDate'],selection_params['endDate']):
-
-                print('>>>>>>>>> '+icollection+' '+selection_params['varnames'][icl]+', '+selection_params['regions_tag'][i]+' '+istart[0:10]+' to '+iend[0:10])
-
-                iparam = {}
-                iparam = {'data': selection_params['varnames'][icl]+selection_params['varnames_qc'][icl]}
-                if ireg:
-                    iparam[selection_params['regions_type'][i]] = ireg
-                if istart and 'glodap' not in icollection:
-                    iparam['startDate'] = istart
-                else:
-                    istart = ''
-                if iend and 'glodap' not in icollection:
-                    iparam['endDate']   = iend
-                else:
-                    iend = ''
-                api_output = avh.query(icollection, options=iparam, verbose='true',apikey=API_KEY, apiroot=get_route(icollection)) 
-                api_output_formatted = format_api_output(api_output=api_output,selection_params=selection_params,index_collection=icl,API_KEY=API_KEY)
-
-                # include some more info from selection_params
-                api_output_formatted['region']  =ireg
-                api_output_formatted['startDate']=istart
-                api_output_formatted['endDate']  =iend
-
-                api_output_formatted['region_type']=selection_params['regions_type'][i]
-                api_output_formatted['region_tag']=selection_params['regions_tag'][i]
-
-                api_output_formatted['vartitle']=selection_params['vartitle']
-
-                #print(api_output_formatted.keys())
-                api_output_formatted_list.append(api_output_formatted)
-    return api_output_formatted_list
-    
 # function to format the output of an api query, to make visualizing it easier
-def format_api_output(api_output,selection_params,index_collection,API_KEY=''):
+def format_api_output(api_output,selection_params,varname,index_collection,API_KEY=''):
 # api_output is the output of an API query
+# varname is the name of the variable we would like to save in the formatted output
 # selection_params is a dictionary with info about the query (documentation to be included)
 # index_collection is an integer pointing to the desired item in the list of collections within selection_params
     api_output_formatted = {}
     api_output_formatted['collection'] = selection_params['collections'][index_collection]
-    api_output_formatted['varname']    = selection_params['varnames'][index_collection]
-    api_output_formatted['varname_qc'] = selection_params['varnames_qc'][index_collection]
+    api_output_formatted['varname']    = varname
+    
     if api_output:
         # create a list with information for non gridded products
         if 'grids' not in selection_params['collections'][index_collection] and 'timeseries' not in selection_params['collections'][index_collection]:
+            # if more than one variable is included in api_output, this will only store the one indicated in varname above
             api_output_formatted['_id']      =[x['_id'] for x in api_output]
-            api_output_formatted['data']     =[x['data'][0] for x in api_output]
-            api_output_formatted['levels']   =[x['data'][1] for x in api_output]
+            
+            api_output_formatted['data']     =[x['data'][x['data_info'][0].index(varname)] for x in api_output]
+            api_output_formatted['levels']   =[x['data'][x['data_info'][0].index(selection_params['varname_levels'][index_collection])] for x in api_output]
             api_output_formatted['timestamp']=[dateutil.parser.isoparse(x['timestamp']) for x in api_output]
             api_output_formatted['longitude']=[x['geolocation']['coordinates'][0] for x in api_output]
             api_output_formatted['latitude'] =[x['geolocation']['coordinates'][1] for x in api_output]
 
+            api_output_formatted['data_units']=api_output[0]['data_info'][2][api_output[0]['data_info'][0].index(varname)][0]
+            
             # if interp_levels are provided, then interpolate and create an xarray
             if 'interp_levels' in selection_params.keys():
                 interpolated_profiles = []
                 for idata in api_output:
                              interpolated_profiles.append(interpolate_profiles(profile=idata, levels_varname=selection_params['varname_levels'][index_collection], levels_new=selection_params['interp_levels']))
                         
+                # if more than one variable is included in api_output, this will only store the one indicated in varname above
                 d = [x['data'] for x in interpolated_profiles]
-                d = [[level[selection_params['varnames'][index_collection]] for level in x] for x in d]
+                d = [[level[varname] for level in x] for x in d]
                     
                 # create xarray
                 d_ind = np.array([list(range(1,len(api_output)+1))]*len(selection_params['interp_levels'])).transpose().tolist()
@@ -212,11 +192,55 @@ def format_api_output(api_output,selection_params,index_collection,API_KEY=''):
                             "id": api_output[0]['metadata'][0]
                             }
                 grids_meta = avh.query('grids/meta', options=grids_opt, verbose='true',apikey=API_KEY, apiroot=get_route(selection_params['collections'][index_collection]))
-                api_output_formatted['data_xarray'] = grids_to_xarray(api_output,grids_meta)
+                       
+                api_output_formatted['data_units'] = grids_meta[0]['data_info'][2][grids_meta[0]['data_info'][0].index(varname)][0] 
+                
+                api_output_formatted['data_xarray'] = grids_to_xarray(api_output,grids_meta,varname)
                 
     return api_output_formatted
 
-def api_output_formatted_list_plot_lons_lats_map(api_output_formatted_list):
+# function to get a list of formatted api output
+def get_api_output_formatted_list_1var(selection_params,API_KEY):
+
+    api_output_formatted_list = []
+
+    for icl,icollection in enumerate(selection_params['collections']):
+        for i,ireg in enumerate(selection_params['regions']):
+            for istart,iend in zip(selection_params['startDate'],selection_params['endDate']):
+
+                print('>>>>>>>>> '+icollection+' '+selection_params['varnames'][icl]+', '+selection_params['regions_tag'][i]+' '+istart[0:10]+' to '+iend[0:10])
+
+                iparam = {}
+                iparam = {'data': selection_params['varnames'][icl]+selection_params['varnames_qc'][icl]+selection_params['data_extra'][icl]}
+                if ireg:
+                    iparam[selection_params['regions_type'][i]] = ireg
+                if istart and 'glodap' not in icollection:
+                    iparam['startDate'] = istart
+                else:
+                    istart = ''
+                if iend and 'glodap' not in icollection:
+                    iparam['endDate']   = iend
+                else:
+                    iend = ''
+                api_output = avh.query(icollection, options=iparam, verbose='true',apikey=API_KEY, apiroot=get_route(icollection)) 
+                api_output_formatted = format_api_output(api_output=api_output,selection_params=selection_params,varname=selection_params['varnames'][icl],index_collection=icl,API_KEY=API_KEY) # please note that we specify varname as there may be more than one variable requested in other cases (in this specific function, we are focusing on comparing the same variable across datasets)
+
+                # include some more info from selection_params
+                api_output_formatted['region']   =ireg
+                api_output_formatted['startDate']=istart
+                api_output_formatted['endDate']  =iend
+
+                api_output_formatted['region_type']=selection_params['regions_type'][i]
+                api_output_formatted['region_tag']=selection_params['regions_tag'][i]
+
+                api_output_formatted['varname_title']=selection_params['varname_title']
+
+                #print(api_output_formatted.keys())
+                api_output_formatted_list.append(api_output_formatted)
+    return api_output_formatted_list
+    
+
+def api_output_formatted_list_1var_plot_lons_lats_map(api_output_formatted_list):
     # let's plot a map for the locations of point data (if the selected collections are not for point data, there will be no plot)
     for i_api_output_formatted in api_output_formatted_list:
         #print(i_api_output_formatted.keys())
@@ -224,7 +248,7 @@ def api_output_formatted_list_plot_lons_lats_map(api_output_formatted_list):
             map_lons_lats(i_api_output_formatted['longitude'], i_api_output_formatted['latitude'],dx=20,dy=20)
             plt.title(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']+'\n'+i_api_output_formatted['startDate'][0:10]+' to '+i_api_output_formatted['endDate'][0:10])
 
-def api_output_formatted_list_plot_profiles(api_output_formatted_list):
+def api_output_formatted_list_1var_plot_profiles(api_output_formatted_list):
     # let's plot data for each of the point data (if the selected collections are not for point data, there will be no plot)
     for i_api_output_formatted in api_output_formatted_list:
         #print(i_api_output_formatted.keys())
@@ -235,10 +259,10 @@ def api_output_formatted_list_plot_profiles(api_output_formatted_list):
             plt.title(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']+'\n'+i_api_output_formatted['startDate'][0:10]+' to '+i_api_output_formatted['endDate'][0:10])
             plt.xticks(size=14);plt.yticks(size=14)
             plt.ylabel('Vertical level (m or dbar)',size=14)
-            plt.xlabel(i_api_output_formatted['vartitle'],size=14)
+            plt.xlabel(i_api_output_formatted['varname_title']+', '+ i_api_output_formatted['data_units'],size=14)
             plt.gca().invert_yaxis()
 
-def api_output_formatted_list_plot_map(api_output_formatted_list,ilev=0,itime=0):
+def api_output_formatted_list_1var_plot_map(api_output_formatted_list,ilev=0,itime=0):
     # plot the map for one timestep/level for each of the gridded products
     # ilev and itime are integers representing the index of intrest
     for i_api_output_formatted in api_output_formatted_list:
@@ -252,7 +276,7 @@ def api_output_formatted_list_plot_map(api_output_formatted_list,ilev=0,itime=0)
                     time_info = '\n'+i_api_output_formatted['startDate'][0:10]+' to '+i_api_output_formatted['endDate'][0:10]
                 plt.title(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+','+i_api_output_formatted['region_tag']+time_info)
                 
-def api_output_formatted_list_plot_horizontal_and_time_ave(api_output_formatted_list,colors):     
+def api_output_formatted_list_1var_plot_horizontal_and_time_ave(api_output_formatted_list,colors):     
     # plot horizontal average using xarray objects
     # colors are a list with valid color names e.g. ['r' 'violet']
     plt.figure(figsize=(5,8))
@@ -267,7 +291,7 @@ def api_output_formatted_list_plot_horizontal_and_time_ave(api_output_formatted_
             #print(horiz_ave.sizes)
             horiz_ave['data'].plot(y='levels',color=colors[i],yincrease=False)
             plt.ylabel('Vertical level (m or dbar)',size=14)
-            plt.xlabel(i_api_output_formatted['vartitle'],size=14)
+            plt.xlabel(i_api_output_formatted['varname_title']+', '+ i_api_output_formatted['data_units'],size=14)
             plt.xticks(size=14);plt.yticks(size=14)
             time_info = ''
             if i_api_output_formatted['startDate'] and i_api_output_formatted['endDate']:
