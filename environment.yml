@@ -12,5 +12,5 @@ dependencies:
   - shapely=1.7.1
   - pip:
     - svgpath2mpl==1.0.0
-    - argovisHelpers==0.0.19
+    - argovisHelpers==0.0.22
     - scipy==1.9.3
