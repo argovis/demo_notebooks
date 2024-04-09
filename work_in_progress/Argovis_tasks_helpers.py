@@ -24,6 +24,7 @@ def get_route(collection_name):
 ######## show list of variables for each collection in list
 def show_variable_names_for_collections(collections_list,API_KEY):
     for icollection in collections_list:
+        print('>>>>> '+icollection)
         try:
             print(avh.query(icollection+'/vocabulary', options={'parameter': 'data'}, verbose='true',apikey=API_KEY, apiroot=get_route(icollection)) )
         except:
@@ -245,10 +246,14 @@ def get_api_output_formatted_list_1var_for_regions_and_timeranges(selection_para
                     iparam['startDate'] = istart
                 else:
                     istart = ''
+                    if 'glodap' in icollection:
+                        iparam['startDate'] = '1000-01-01T00:00:00.000Z'
                 if iend and 'glodap' not in icollection:
                     iparam['endDate']   = iend
                 else:
                     iend = ''
+                    if 'glodap' in icollection:
+                        iparam['endDate'] = '1000-01-02T00:00:00.000Z'
                 api_output = avh.query(icollection, options=iparam, verbose='true',apikey=API_KEY, apiroot=get_route(icollection)) 
                 
                 api_output_formatted_all = {}
@@ -264,7 +269,7 @@ def get_api_output_formatted_list_1var_for_regions_and_timeranges(selection_para
 
                         api_output_formatted_all[ivar]['region_type']=selection_params['regions_type'][i]
                         api_output_formatted_all[ivar]['region_tag']=selection_params['regions_tag'][i]
-
+                        
                         api_output_formatted_all[ivar]['varname_title']=selection_params['varname_title']
 
                     
@@ -297,7 +302,7 @@ def get_api_output_formatted_list_1var_for_parameter(selection_params,API_KEY):
 
         if selection_params['parameter_name'] == 'woceline':
             # how the user assigns the start date should be improved
-            iparam['section_start_date'] = selection_params['section_start_date']
+            iparam['section_start_date'] = selection_params['section_start_date'][i]
 
         # let's query data from the selected object
         api_output = avh.query(icollection, options=iparam, verbose='true',apikey=API_KEY, apiroot=get_route(icollection))
@@ -309,7 +314,11 @@ def get_api_output_formatted_list_1var_for_parameter(selection_params,API_KEY):
             if not ivar.isnumeric():
                 #api_output_formatted_all_var.append(ivar)
                 api_output_formatted_all[ivar] = format_api_output(api_output,selection_params,ivar,index_collection=i,API_KEY='')
-                api_output_formatted_all[ivar]['region_tag']    = ''
+                if 'region_tag' in selection_params.keys():
+                    api_output_formatted_all[ivar]['region_tag']=selection_params['regions_tag'][i]
+                else:
+                    api_output_formatted_all[ivar]['region_tag']= ''
+                    
                 api_output_formatted_all[ivar]['startDate']     = min(api_output_formatted_all[ivar]['timestamp']).strftime("%Y-%m-%d")
                 api_output_formatted_all[ivar]['endDate']       = max(api_output_formatted_all[ivar]['timestamp']).strftime("%Y-%m-%d")
                 api_output_formatted_all[ivar]['varname_title'] = ivar[0].upper()+ivar[1::]
@@ -364,11 +373,24 @@ def api_output_formatted_list_1var_plot_map(api_output_formatted_list,ilev=0,iti
 def api_output_formatted_list_1var_plot_horizontal_and_time_ave(api_output_formatted_list,colors):     
     # plot horizontal average using xarray objects
     # colors are a list with valid color names e.g. ['r' 'violet']
-    plt.figure(figsize=(5,8))
-    leg = []
+    
+    figure_vars = []
+    
     for i,i_api_output_formatted_all in enumerate(api_output_formatted_list):
-        for ivar in i_api_output_formatted_all.keys():
-            i_api_output_formatted =  i_api_output_formatted_all[ivar]
+        figure_vars.append(list(i_api_output_formatted_all.keys()))
+        
+    itest = len(figure_vars[0])
+    for i in figure_vars:
+        if len(i) != itest:
+            print('Something is wrong, not all the items in api_output_formatted_list have the same number of variables')
+            checkwhy
+    
+    for inum,inum_var in enumerate(figure_vars[0]):
+        plt.figure(figsize=(6,8))
+        leg = []
+        for i,i_api_output_formatted_all in enumerate(api_output_formatted_list):
+        
+            i_api_output_formatted =  i_api_output_formatted_all[figure_vars[i][inum]]
     
             if 'data_xarray' in i_api_output_formatted.keys():
                 if 'longitude' in list(i_api_output_formatted['data_xarray'].coords) and 'latitude' in list(i_api_output_formatted['data_xarray'].coords):
