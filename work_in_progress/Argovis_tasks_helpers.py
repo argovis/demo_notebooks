@@ -295,13 +295,14 @@ def get_api_output_formatted_list_1var_for_parameter(selection_params,API_KEY):
         # we can only use the qc flags for datasets that support them
         if icollection not in ['argo','cchdo']:
             print('QC flags are used only for Argo and CCHDO')
-            data_str = selection_params['varnames'][i]
+            #data_str = selection_params['varnames'][i]
             data_str_new = ''
             for ivar in data_str.split(','):
                 if not ivar.isnumeric():
                     data_str_new = data_str_new+','+ivar
             data_str = data_str_new[1::]
 
+        print(data_str)
         iparam = {}
         iparam = {'data': data_str}
 
