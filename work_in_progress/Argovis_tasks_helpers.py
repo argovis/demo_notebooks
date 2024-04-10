@@ -295,7 +295,6 @@ def get_api_output_formatted_list_1var_for_parameter(selection_params,API_KEY):
         # we can only use the qc flags for datasets that support them
         if icollection not in ['argo','cchdo']:
             print('QC flags are used only for Argo and CCHDO')
-            #data_str = selection_params['varnames'][i]
             data_str_new = ''
             for ivar in data_str.split(','):
                 if not ivar.isnumeric():
@@ -356,7 +355,7 @@ def api_output_formatted_list_1var_plot_profiles(api_output_formatted_list):
             else:
                 flag_xarray = False
             if 'data' in i_api_output_formatted.keys() or flag_xarray:
-                plt.figure(figsize=(5,8))
+                plt.figure(figsize=(7,8))
                 if 'data' in i_api_output_formatted.keys():
                     for i,idata in enumerate(i_api_output_formatted['data']):
                         plt.plot(idata,i_api_output_formatted['levels'][i],'k')
