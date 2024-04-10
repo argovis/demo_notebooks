@@ -22,19 +22,26 @@ def get_route(collection_name):
         return 'https://argovis-api.colorado.edu/'
 
 ######## show list of variables for each collection in list
-def show_variable_names_for_collections(collections_list,API_KEY):
+def show_variable_names_for_collections(collections_list,API_KEY,verbose=False):
+    vars_list = []
     for icollection in collections_list:
         print('>>>>> '+icollection)
         try:
-            print(avh.query(icollection+'/vocabulary', options={'parameter': 'data'}, verbose='true',apikey=API_KEY, apiroot=get_route(icollection)) )
+            bfr = avh.query(icollection+'/vocabulary', options={'parameter': 'data'}, verbose='true',apikey=API_KEY, apiroot=get_route(icollection)) 
+            if verbose:
+                print(bfr)
+            vars_list.append(bfr)
         except:
             print('No data parameter for vocabulary query')
         try:
             bfr = avh.query(icollection+'/vocabulary', verbose='true',apikey=API_KEY, apiroot=get_route(icollection))
-            print(*bfr[0]['data'],sep=',')
+            if verbose:
+                print(*bfr[0]['data'],sep=',')
+            vars_list.append(bfr[0]['data'])
         except:
             print('Needs data parameter for vocabulary query')
-    
+    return vars_list
+
 # interpolate profiles (this can be used also for grids/, as they are stored as profiles
 def interpolate_profiles(profile, levels_varname, levels_new):
     # given a <profile>, a string for the name <levels_varname> of the variable containing the levels, and a list of desired values for vertical levels <levels_new>,
@@ -258,7 +265,7 @@ def get_api_output_formatted_list_1var_for_regions_and_timeranges(selection_para
                 
                 api_output_formatted_all = {}
                 for ivar in data_str.split(','):
-                    if not ivar.isnumeric():
+                    if not ivar.isnumeric() and '~' not in ivar:
                         api_output_formatted = format_api_output(api_output=api_output,selection_params=selection_params,varname=selection_params['varnames'][icl],index_collection=icl,API_KEY=API_KEY) # please note that we specify varname as there may be more than one variable requested in other cases (in this specific function, we are focusing on comparing the same variable across datasets)
 
                         api_output_formatted_all[ivar]=api_output_formatted
@@ -311,7 +318,7 @@ def get_api_output_formatted_list_1var_for_parameter(selection_params,API_KEY):
         api_output_formatted_all = {}
         #api_output_formatted_all_var = []
         for ivar in data_str.split(','):
-            if not ivar.isnumeric():
+            if not ivar.isnumeric() and '~' not in ivar:
                 #api_output_formatted_all_var.append(ivar)
                 api_output_formatted_all[ivar] = format_api_output(api_output,selection_params,ivar,index_collection=i,API_KEY='')
                 if 'region_tag' in selection_params.keys():
@@ -337,16 +344,30 @@ def api_output_formatted_list_1var_plot_lons_lats_map(api_output_formatted_list)
                 plt.title(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']+'\n'+i_api_output_formatted['startDate'][0:10]+' to '+i_api_output_formatted['endDate'][0:10])
 
 def api_output_formatted_list_1var_plot_profiles(api_output_formatted_list):
-    # let's plot data for each of the point data (if the selected collections are not for point data, there will be no plot)
+    # let's plot data for each of the point data (if the selected collections are not 
+    # for point data, vertical profiles will be plotted for all the x,y points in the grid, at each time)
     for i_api_output_formatted_all in api_output_formatted_list:
         for ivar in i_api_output_formatted_all.keys():
             i_api_output_formatted =  i_api_output_formatted_all[ivar]
-            # print(i_api_output_formatted.keys())
-            if 'data' in i_api_output_formatted.keys():
+            #print(i_api_output_formatted.keys())
+            if 'data_xarray' in i_api_output_formatted.keys():
+                flag_xarray = np.logical_and('longitude' in list(i_api_output_formatted['data_xarray'].coords) and 'latitude' in list(i_api_output_formatted['data_xarray'].coords),'timestamp' in list(i_api_output_formatted['data_xarray'].coords))
+            else:
+                flag_xarray = False
+            if 'data' in i_api_output_formatted.keys() or flag_xarray:
                 plt.figure(figsize=(5,8))
-                for i,idata in enumerate(i_api_output_formatted['data']):
-                    plt.plot(idata,i_api_output_formatted['levels'][i],'k')
-                plt.title(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']+'\n'+i_api_output_formatted['startDate'][0:10]+' to '+i_api_output_formatted['endDate'][0:10])
+                if 'data' in i_api_output_formatted.keys():
+                    for i,idata in enumerate(i_api_output_formatted['data']):
+                        plt.plot(idata,i_api_output_formatted['levels'][i],'k')
+                elif flag_xarray:
+                    # let's stack data_xarray so that one dimension is 'levels' and all the other dimensions are collapsed into a new dimension
+                    xar_stacked = i_api_output_formatted['data_xarray'].stack(ind=("longitude","latitude","timestamp"))
+                    plt.plot(xar_stacked['data'].values,i_api_output_formatted['data_xarray'].coords['levels'].values,'k')
+                
+                bfr_title = i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']
+                if i_api_output_formatted['startDate'] and i_api_output_formatted['endDate']:
+                    bfr_title = bfr_title + '\n'+i_api_output_formatted['startDate'][0:10]+' to '+i_api_output_formatted['endDate'][0:10]
+                plt.title(bfr_title)
                 plt.xticks(size=14);plt.yticks(size=14)
                 plt.ylabel('Vertical level (m or dbar)',size=14)
                 plt.xlabel(i_api_output_formatted['varname_title']+', '+ i_api_output_formatted['data_units'],size=14)
