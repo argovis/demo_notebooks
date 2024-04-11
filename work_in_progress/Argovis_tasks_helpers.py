@@ -12,6 +12,7 @@ import dateutil
 
 from argovisHelpers import helpers as avh
 import xarray as xr
+import gsw
 
 # get the correct route, given the collection name
 def get_route(collection_name):
@@ -430,3 +431,76 @@ def api_output_formatted_list_1var_plot_horizontal_and_time_ave(api_output_forma
                 leg.append(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']+time_info)
     plt.legend(leg)
     plt.show()
+def include_fields_from_gsw(list_fields_to_include,api_output_formatted_list0,varname_temperature,varname_salinity):
+    # list_fields_to_include = ['potential_density','Nsquared','absolute_salinity','conservative_temperature']
+    for ilist,iapi_output in enumerate(api_output_formatted_list0):
+        # calculate potential density from 'data'
+        bfr_data_temp = iapi_output[varname_temperature]['data']
+        bfr_data_salt = iapi_output[varname_salinity]['data']
+        bfr_data_levels =iapi_output[varname_salinity]['levels']
+
+        bfr_data_lon  = iapi_output[varname_salinity]['longitude']
+        bfr_data_lat  = iapi_output[varname_salinity]['latitude']
+        
+        # initialize new fields
+        for ivar in list_fields_to_include:
+            api_output_formatted_list0[ilist][ivar]={}
+            api_output_formatted_list0[ilist][ivar]['data']        = []
+            api_output_formatted_list0[ilist][ivar]['levels'] = []
+
+        for i,idata in enumerate(bfr_data_salt):
+            bfr_SA = gsw.conversions.SA_from_SP(SP=bfr_data_salt[i], p=bfr_data_levels[i], lon=bfr_data_lon[i], lat=bfr_data_lat[i])
+            bfr_CT = gsw.conversions.CT_from_t(SA=bfr_SA, t=bfr_data_temp[i], p=bfr_data_levels[i])
+            
+            if 'absolute_salinity' in list_fields_to_include:
+                api_output_formatted_list0[ilist]['absolute_salinity']['data'].append(bfr_SA)
+                # include e.g. levels, long, lat for consistency with other variables
+                api_output_formatted_list0[ilist]['absolute_salinity']['levels']=bfr_data_levels
+                
+            if 'conservative_temperature' in list_fields_to_include:
+                api_output_formatted_list0[ilist]['conservative_temperature']['data'].append(bfr_CT)
+                # include e.g. levels, long, lat for consistency with other variables
+                api_output_formatted_list0[ilist]['conservative_temperature']['levels']=bfr_data_levels
+                
+            if 'potential_density' in list_fields_to_include:
+                bfr_PD = gsw.density.sigma0(SA=bfr_SA, CT=bfr_CT)
+                api_output_formatted_list0[ilist]['potential_density']['data'].append(bfr_PD+1000)
+                # include e.g. levels, long, lat for consistency with other variables
+                api_output_formatted_list0[ilist]['potential_density']['levels']=bfr_data_levels
+                
+            if 'Nsquared' in list_fields_to_include:
+                bfr_N =gsw.stability.Nsquared(SA=bfr_SA, CT=bfr_CT, p=bfr_data_levels[i], lat=bfr_data_lat[i], axis=0)
+                #print(bfr_N)
+                api_output_formatted_list0[ilist]['Nsquared']['data'].append(bfr_N[0])
+                api_output_formatted_list0[ilist]['Nsquared']['levels'].append(bfr_N[1])
+        
+        if 'absolute_salinity' in list_fields_to_include:
+            api_output_formatted_list0[ilist]['absolute_salinity']['varname']='absolute_salinity'
+            api_output_formatted_list0[ilist]['absolute_salinity']['varname_title']='Absolute salinity'
+            api_output_formatted_list0[ilist]['absolute_salinity']['data_units']='g/kg'
+
+        if 'conservative_temperature' in list_fields_to_include:
+            api_output_formatted_list0[ilist]['conservative_temperature']['varname']='conservative_temperature'
+            api_output_formatted_list0[ilist]['conservative_temperature']['varname_title']='Conservative temperature'
+            api_output_formatted_list0[ilist]['conservative_temperature']['data_units']='degC'
+
+        if 'potential_density' in list_fields_to_include:
+            api_output_formatted_list0[ilist]['potential_density']['varname']='potential_density'
+            api_output_formatted_list0[ilist]['potential_density']['varname_title']='Potential Density'
+            api_output_formatted_list0[ilist]['potential_density']['data_units']='kg/m^3'
+
+        if 'Nsquared' in list_fields_to_include:
+            # Frequency N is in radians per second
+            api_output_formatted_list0[ilist]['Nsquared']['varname']='Nsquared'
+            api_output_formatted_list0[ilist]['Nsquared']['varname_title']='Buoyancy frequency-squared'
+            api_output_formatted_list0[ilist]['Nsquared']['data_units']='1/s^2'
+
+        for ivar in list_fields_to_include:
+            api_output_formatted_list0[ilist][ivar]['longitude']=bfr_data_levels
+            api_output_formatted_list0[ilist][ivar]['latitude']=bfr_data_levels
+
+            api_output_formatted_list0[ilist][ivar]['collection']=iapi_output[varname_salinity]['collection']
+            api_output_formatted_list0[ilist][ivar]['region_tag']=iapi_output[varname_salinity]['region_tag']
+            api_output_formatted_list0[ilist][ivar]['startDate']=iapi_output[varname_salinity]['startDate']
+            api_output_formatted_list0[ilist][ivar]['endDate']=iapi_output[varname_salinity]['endDate']
+    return(api_output_formatted_list0)
