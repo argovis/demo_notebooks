@@ -183,12 +183,14 @@ def format_api_output(api_output,selection_params,varname,index_collection,API_K
             # if more than one variable is included in api_output, this will only store the one indicated in varname above
             api_output_formatted['_id']      =[x['_id'] for x in api_output]
             
+            #? the next 2 lines should be adjusted to see if we can avoid assuming the correct index is '0' for the variable name (we should be able to query the legend?)
             api_output_formatted['data']     =[x['data'][x['data_info'][0].index(varname)] for x in api_output]
             api_output_formatted['levels']   =[x['data'][x['data_info'][0].index(selection_params['varname_levels'][index_collection])] for x in api_output]
             api_output_formatted['timestamp']=[dateutil.parser.isoparse(x['timestamp']) for x in api_output]
             api_output_formatted['longitude']=[x['geolocation']['coordinates'][0] for x in api_output]
             api_output_formatted['latitude'] =[x['geolocation']['coordinates'][1] for x in api_output]
 
+            #? the next line should be adjusted to see if we can avoid assuming the correct index is '0' for the variable name and for the units (we should be able to query the legend?)
             api_output_formatted['data_units']=api_output[0]['data_info'][2][api_output[0]['data_info'][0].index(varname)][0]
             
             # if interp_levels are provided, then interpolate and create an xarray
@@ -229,6 +231,7 @@ def format_api_output(api_output,selection_params,varname,index_collection,API_K
                             "id": igm
                             }
                         grids_meta = avh.query('grids/meta',options=grids_opt,verbose='true', apikey=API_KEY, apiroot=get_route(selection_params['collections'][index_collection]))
+                        #? the next line should be adjusted to see if we can avoid assuming the correct index is '0' for the variable name and for the units (we should be able to query the legend?)
                         api_output_formatted['data_units'] = grids_meta[0]['data_info'][2][grids_meta[0]['data_info'][0].index(varname)][0] 
                         
                     except:
@@ -273,7 +276,8 @@ def get_api_output_formatted_list_1var_for_regions_and_timeranges(selection_para
                 api_output_formatted_all = {}
                 for ivar in data_str.split(','):
                     if not ivar.isnumeric() and '~' not in ivar:
-                        api_output_formatted = format_api_output(api_output=api_output,selection_params=selection_params,varname=selection_params['varnames'][icl],index_collection=icl,API_KEY=API_KEY) # please note that we specify varname as there may be more than one variable requested in other cases (in this specific function, we are focusing on comparing the same variable across datasets)
+                        
+                        api_output_formatted = format_api_output(api_output=api_output,selection_params=selection_params,varname=ivar,index_collection=icl,API_KEY=API_KEY) # please note that we specify varname as there may be more than one variable requested in other cases (in this specific function, we are focusing on comparing the same variable across datasets)
 
                         api_output_formatted_all[ivar]=api_output_formatted
                         # include some more info from selection_params
@@ -339,9 +343,9 @@ def get_api_output_formatted_list_1var_for_parameter(selection_params,API_KEY):
         api_output_formatted_list.append(api_output_formatted_all)
     return api_output_formatted_list
 
-
-def api_output_formatted_list_1var_plot_lons_lats_map(api_output_formatted_list):
+def api_output_formatted_list_1var_plot_lons_lats_map(api_output_formatted_list,flag_map_for_only_one_var=True):
     # let's plot a map for the locations of point data (if the selected collections are not for point data, there will be no plot)
+    # flag_map_for_only_one_var is true by default as we can just plot the locations for one variable (as all the variables have to be available for each profile)
     for i_api_output_formatted_all in api_output_formatted_list:
         for ivar in i_api_output_formatted_all.keys():
             i_api_output_formatted =  i_api_output_formatted_all[ivar]
@@ -349,10 +353,13 @@ def api_output_formatted_list_1var_plot_lons_lats_map(api_output_formatted_list)
             if 'data' in i_api_output_formatted.keys():
                 map_lons_lats(i_api_output_formatted['longitude'], i_api_output_formatted['latitude'],dx=20,dy=20)
                 plt.title(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']+'\n'+i_api_output_formatted['startDate'][0:10]+' to '+i_api_output_formatted['endDate'][0:10])
+                if flag_map_for_only_one_var:
+                    return
 
 def api_output_formatted_list_1var_plot_profiles(api_output_formatted_list):
     # let's plot data for each of the point data (if the selected collections are not 
     # for point data, vertical profiles will be plotted for all the x,y points in the grid, at each time)
+    
     for i_api_output_formatted_all in api_output_formatted_list:
         for ivar in i_api_output_formatted_all.keys():
             i_api_output_formatted =  i_api_output_formatted_all[ivar]
@@ -379,7 +386,7 @@ def api_output_formatted_list_1var_plot_profiles(api_output_formatted_list):
                 plt.ylabel('Vertical level (m or dbar)',size=14)
                 plt.xlabel(i_api_output_formatted['varname_title']+', '+ i_api_output_formatted['data_units'],size=14)
                 plt.gca().invert_yaxis()
-
+                
 def api_output_formatted_list_1var_plot_map(api_output_formatted_list,ilev=0,itime=0):
     # plot the map for one timestep/level for each of the gridded products
     # ilev and itime are integers representing the index of intrest
@@ -444,14 +451,23 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
         
         ##### first let's include gsw fields for the raw profile data
         # calculate potential density from 'data'
-        bfr_data_temp   = copy.deepcopy(iapi_output[varname_temperature]['data'])
+        if varname_salinity not in iapi_output.keys():
+            print('>>> ' + api_output_formatted_list0[ilist]['collection:'])
+            print(varname_salinity + ' is not available, hence gsw cannot be used for SA')
+            break
+        
         bfr_data_salt   = copy.deepcopy(iapi_output[varname_salinity]['data'])
         bfr_data_levels =copy.deepcopy(iapi_output[varname_salinity]['levels'])
 
         bfr_data_lon    = copy.deepcopy(iapi_output[varname_salinity]['longitude'])
         bfr_data_lat    = copy.deepcopy(iapi_output[varname_salinity]['latitude'])
         bfr_data_tstamp = copy.deepcopy(iapi_output[varname_salinity]['timestamp'])
-        
+            
+        if varname_temperature in iapi_output.keys():
+            bfr_data_temp   = copy.deepcopy(iapi_output[varname_temperature]['data'])
+        else:
+            print(varname_temperature + ' is not available, hence gsw cannot be used for CT')   
+            
         # initialize new fields
         for ivar in list_fields_to_include:
             api_output_formatted_list0[ilist][ivar]={}
@@ -460,18 +476,22 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
 
         
         for i,idata in enumerate(bfr_data_salt):
+            
             bfrbfr_salt = bfr_data_salt[i]
             bfrbfr_salt = [np.nan if i is None else i for i in bfrbfr_salt]
-            
-            bfrbfr_temp = bfr_data_temp[i]
-            bfrbfr_temp = [np.nan if i is None else i for i in bfrbfr_temp]
             
             bfrbfr_levs = bfr_data_levels[i]
             bfrbfr_levs = [np.nan if i is None else i for i in bfrbfr_levs]
             
+            if varname_temperature in iapi_output.keys():
+                bfrbfr_temp = bfr_data_temp[i]
+                bfrbfr_temp = [np.nan if i is None else i for i in bfrbfr_temp]
+            
             bfr_SA = gsw.conversions.SA_from_SP(SP=bfrbfr_salt, p=bfrbfr_levs,
                                                 lon=bfr_data_lon[i], lat=bfr_data_lat[i])
-            bfr_CT = gsw.conversions.CT_from_t(SA=bfr_SA, t=bfrbfr_temp, p=bfrbfr_levs)
+            
+            if varname_temperature in iapi_output.keys():
+                bfr_CT = gsw.conversions.CT_from_t(SA=bfr_SA, t=bfrbfr_temp, p=bfrbfr_levs)
             
             if 'absolute_salinity' in list_fields_to_include:
                 api_output_formatted_list0[ilist]['absolute_salinity']['data'].append(bfr_SA)
@@ -479,73 +499,87 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
                 api_output_formatted_list0[ilist]['absolute_salinity']['levels']=bfr_data_levels
                 
             if 'conservative_temperature' in list_fields_to_include:
-                api_output_formatted_list0[ilist]['conservative_temperature']['data'].append(bfr_CT)
-                # include e.g. levels, long, lat for consistency with other variables
-                api_output_formatted_list0[ilist]['conservative_temperature']['levels']=bfr_data_levels
-                
+                if varname_temperature in iapi_output.keys():
+                    api_output_formatted_list0[ilist]['conservative_temperature']['data'].append(bfr_CT)
+                    # include e.g. levels, long, lat for consistency with other variables
+                    api_output_formatted_list0[ilist]['conservative_temperature']['levels']=bfr_data_levels
+                else:
+                    api_output_formatted_list0[ilist].drop_vars(['conservative_temperature'])
+
             if 'potential_density' in list_fields_to_include:
-                bfr_PD = gsw.density.sigma0(SA=bfr_SA, CT=bfr_CT)
-                api_output_formatted_list0[ilist]['potential_density']['data'].append(bfr_PD+1000)
-                # include e.g. levels, long, lat for consistency with other variables
-                api_output_formatted_list0[ilist]['potential_density']['levels']=bfr_data_levels
-                
+                if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
+                    bfr_PD = gsw.density.sigma0(SA=bfr_SA, CT=bfr_CT)
+                    api_output_formatted_list0[ilist]['potential_density']['data'].append(bfr_PD+1000)
+                    # include e.g. levels, long, lat for consistency with other variables
+                    api_output_formatted_list0[ilist]['potential_density']['levels']=bfr_data_levels
+                else:
+                    api_output_formatted_list0[ilist].drop_vars(['potential_density'])
+                    
             if 'Nsquared' in list_fields_to_include:
-                bfr_N =gsw.stability.Nsquared(SA=bfr_SA, CT=bfr_CT, p=bfrbfr_levs, lat=bfr_data_lat[i], axis=0)
+                if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
+                    bfr_N =gsw.stability.Nsquared(SA=bfr_SA, CT=bfr_CT, p=bfrbfr_levs, lat=bfr_data_lat[i], axis=0)
                 #print(bfr_N)
-                api_output_formatted_list0[ilist]['Nsquared']['data'].append(bfr_N[0])
-                api_output_formatted_list0[ilist]['Nsquared']['levels'].append(bfr_N[1])
-        
+                    api_output_formatted_list0[ilist]['Nsquared']['data'].append(bfr_N[0])
+                    api_output_formatted_list0[ilist]['Nsquared']['levels'].append(bfr_N[1])
+                else:
+                    api_output_formatted_list0[ilist].drop_vars(['Nsquared'])
+                    
         ##### now let's compute the new fields starting from the vertically integrated profiles, if they are there
         if 'data_xarray' in iapi_output[varname_temperature].keys():
-            #print(iapi_output[varname_temperature]['data_xarray'])
-            bfr_temp_xar = iapi_output[varname_temperature]['data_xarray']['data']
-            bfr_salt_xar = iapi_output[varname_salinity]['data_xarray']['data']
-            bfr_lons_xar = np.tile(bfr_data_lon,(np.shape(bfr_temp_xar.values)[0],1))
-            bfr_lats_xar = np.tile(bfr_data_lat,(np.shape(bfr_temp_xar.values)[0],1))
-            bfr_levs_xar = np.tile(iapi_output[varname_temperature]['data_xarray'].coords['levels'].values,(np.shape(bfr_temp_xar)[1],1)).transpose()
             
-            bfr_xar = copy.deepcopy(iapi_output[varname_temperature]['data_xarray'])
-            bfr_xar['data_salt'] = iapi_output[varname_salinity]['data_xarray']['data']
-            bfr_xar['data_lons'] = (("levels","index"),bfr_lons_xar)
-            bfr_xar['data_lats'] = (("levels","index"),bfr_lats_xar)
-            bfr_xar['data_levs'] = (("levels","index"),bfr_levs_xar)
-            
-            bfr_SA_xar = gsw_xar.conversions.SA_from_SP(SP=bfr_xar['data_salt'], p=bfr_xar['data_levs'],
+            if varname_salinity in iapi_output.keys():
+                bfr_xar = copy.deepcopy(iapi_output[varname_salinity]['data_xarray'])
+                bfr_xar['data_lons'] = (("levels","index"),np.tile(bfr_data_lon,(np.shape(bfr_xar['data'].values)[0],1)))
+                bfr_xar['data_lats'] = (("levels","index"),np.tile(bfr_data_lat,(np.shape(bfr_xar['data'].values)[0],1)))
+                bfr_xar['data_levs'] = (("levels","index"),np.tile(iapi_output[varname_salinity]['data_xarray'].coords['levels'].values,(np.shape(bfr_xar['data'].values)[1],1)).transpose())
+            else:
+                print('>>> ' + api_output_formatted_list0[ilist]['collection:'])
+                print(varname_salinity + ' is not available, hence gsw cannot be used for SA')
+                break
+                
+            bfr_SA_xar = gsw_xar.conversions.SA_from_SP(SP=bfr_xar['data'], p=bfr_xar['data_levs'],
                                                 lon=bfr_xar['data_lons'], lat=bfr_xar['data_lats'])
             
-            bfr_CT_xar = gsw_xar.conversions.CT_from_t(SA=bfr_SA_xar, t=bfr_xar['data'], p=bfr_xar['data_levs'])
-
+            if varname_temperature in iapi_output.keys():
+                bfr_xar['data_temp'] = iapi_output[varname_temperature]['data_xarray']['data']
+                
             if 'absolute_salinity' in list_fields_to_include:
                 api_output_formatted_list0[ilist]['absolute_salinity']['data_xarray']=bfr_SA_xar.to_dataset()
                 api_output_formatted_list0[ilist]['absolute_salinity']['data_xarray']['data']=api_output_formatted_list0[ilist]['absolute_salinity']['data_xarray']['SA']
                 api_output_formatted_list0[ilist]['absolute_salinity']['data_xarray']=api_output_formatted_list0[ilist]['absolute_salinity']['data_xarray'].drop_vars(['SA'])
                 
             if 'conservative_temperature' in list_fields_to_include:
-                api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']=bfr_CT_xar.to_dataset()
-                api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']['data']=api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']['CT']
-                api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']=api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray'].drop_vars(['CT'])
+                if varname_temperature in iapi_output.keys():
+                    bfr_CT_xar = gsw_xar.conversions.CT_from_t(SA=bfr_SA_xar, t=bfr_xar['data_temp'], p=bfr_xar['data_levs'])
+                    api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']=bfr_CT_xar.to_dataset()
+                    api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']['data']=api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']['CT']
+                    api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']=api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray'].drop_vars(['CT'])
                 
             if 'potential_density' in list_fields_to_include:
-                bfr_PD_xar = gsw_xar.density.sigma0(SA=bfr_SA_xar, CT=bfr_CT_xar)+1000
-                api_output_formatted_list0[ilist]['potential_density']['data_xarray']=bfr_PD_xar.to_dataset()
-                api_output_formatted_list0[ilist]['potential_density']['data_xarray']['data']=api_output_formatted_list0[ilist]['potential_density']['data_xarray']['sigma0']
-                api_output_formatted_list0[ilist]['potential_density']['data_xarray']=api_output_formatted_list0[ilist]['potential_density']['data_xarray'].drop_vars(['sigma0'])
+                if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
+                    bfr_PD_xar = gsw_xar.density.sigma0(SA=bfr_SA_xar, CT=bfr_CT_xar)+1000
+                    api_output_formatted_list0[ilist]['potential_density']['data_xarray']=bfr_PD_xar.to_dataset()
+                    api_output_formatted_list0[ilist]['potential_density']['data_xarray']['data']=api_output_formatted_list0[ilist]['potential_density']['data_xarray']['sigma0']
+                    api_output_formatted_list0[ilist]['potential_density']['data_xarray']=api_output_formatted_list0[ilist]['potential_density']['data_xarray'].drop_vars(['sigma0'])
                 
             if 'Nsquared' in list_fields_to_include:
-                bfr_N2xar =gsw_xar.stability.Nsquared(SA=bfr_SA_xar, CT=bfr_CT_xar, p=bfr_xar['data_levs'], lat=bfr_xar['data_lats'])
-                # bfr_N2xar is a tuple, let's now create the xarray dataset                
-                d_ind = np.array([list(range(1,np.shape(bfr_N2xar[0])[1]+1))]*np.shape(bfr_N2xar[0])[0]).tolist()
+                if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
+                    bfr_N2xar =gsw_xar.stability.Nsquared(SA=bfr_SA_xar, CT=bfr_CT_xar, p=bfr_xar['data_levs'], lat=bfr_xar['data_lats'])
+                    
+                    # formatting for N2 from gsw is different than other variables!
+                    # bfr_N2xar is a tuple, let's now create the xarray dataset                
+                    d_ind = np.array([list(range(1,np.shape(bfr_N2xar[0])[1]+1))]*np.shape(bfr_N2xar[0])[0]).tolist()
                 
-#                 print(np.shape(bfr_N2xar[0]))
-#                 print(np.shape(bfr_N2xar[1]))
-#                 print(np.shape(np.array(d_ind)))
-                
-                bfr_N_data_dict = {'data': bfr_N2xar[0].flatten().tolist(),'levels': bfr_N2xar[1].flatten().tolist(),'index':np.array(d_ind).flatten().tolist()
-                        } 
-                bfr_N_data_df = pandas.DataFrame(bfr_N_data_dict)   
-                bfr_N_df_rows = pandas.DataFrame(bfr_N_data_df).set_index(["levels","index"])
-                bfr_N_xar     = xr.Dataset.from_dataframe(bfr_N_df_rows)
-                api_output_formatted_list0[ilist]['Nsquared']['data_xarray']=bfr_N_xar
+    #                 print(np.shape(bfr_N2xar[0]))
+    #                 print(np.shape(bfr_N2xar[1]))
+    #                 print(np.shape(np.array(d_ind)))
+
+                    bfr_N_data_dict = {'data': bfr_N2xar[0].flatten().tolist(),'levels': bfr_N2xar[1].flatten().tolist(),'index':np.array(d_ind).flatten().tolist()
+                            } 
+                    bfr_N_data_df = pandas.DataFrame(bfr_N_data_dict)   
+                    bfr_N_df_rows = pandas.DataFrame(bfr_N_data_df).set_index(["levels","index"])
+                    bfr_N_xar     = xr.Dataset.from_dataframe(bfr_N_df_rows)
+                    api_output_formatted_list0[ilist]['Nsquared']['data_xarray']=bfr_N_xar
                 
             for ivar in list_fields_to_include:
                 api_output_formatted_list0[ilist][ivar]['data_xarray']=api_output_formatted_list0[ilist][ivar]['data_xarray'].assign(longitude=(['index'],np.array(bfr_data_lon)))
@@ -554,28 +588,28 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
                 
                 
         ##### finally let's include additional info for the new variables
-        if 'absolute_salinity' in list_fields_to_include:
+        if 'absolute_salinity' in api_output_formatted_list0[ilist].keys():
             api_output_formatted_list0[ilist]['absolute_salinity']['varname']='absolute_salinity'
             api_output_formatted_list0[ilist]['absolute_salinity']['varname_title']='Absolute salinity'
             api_output_formatted_list0[ilist]['absolute_salinity']['data_units']='g/kg'
 
-        if 'conservative_temperature' in list_fields_to_include:
+        if 'conservative_temperature' in api_output_formatted_list0[ilist].keys():
             api_output_formatted_list0[ilist]['conservative_temperature']['varname']='conservative_temperature'
             api_output_formatted_list0[ilist]['conservative_temperature']['varname_title']='Conservative temperature'
             api_output_formatted_list0[ilist]['conservative_temperature']['data_units']='degC'
 
-        if 'potential_density' in list_fields_to_include:
+        if 'potential_density' in api_output_formatted_list0[ilist].keys():
             api_output_formatted_list0[ilist]['potential_density']['varname']='potential_density'
             api_output_formatted_list0[ilist]['potential_density']['varname_title']='Potential Density'
             api_output_formatted_list0[ilist]['potential_density']['data_units']='kg/m^3'
 
-        if 'Nsquared' in list_fields_to_include:
+        if 'Nsquared' in api_output_formatted_list0[ilist].keys():
             # Frequency N is in radians per second
             api_output_formatted_list0[ilist]['Nsquared']['varname']='Nsquared'
             api_output_formatted_list0[ilist]['Nsquared']['varname_title']='Buoyancy frequency-squared'
             api_output_formatted_list0[ilist]['Nsquared']['data_units']='1/s^2'
 
-        for ivar in list_fields_to_include:
+        for ivar in api_output_formatted_list0[ilist].keys():
             api_output_formatted_list0[ilist][ivar]['longitude']=bfr_data_levels
             api_output_formatted_list0[ilist][ivar]['latitude']=bfr_data_levels
 
