@@ -431,6 +431,7 @@ def api_output_formatted_list_1var_plot_horizontal_and_time_ave(api_output_forma
                 leg.append(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']+time_info)
     plt.legend(leg)
     plt.show()
+
 def include_fields_from_gsw(list_fields_to_include,api_output_formatted_list0,varname_temperature,varname_salinity):
     # list_fields_to_include = ['potential_density','Nsquared','absolute_salinity','conservative_temperature']
     for ilist,iapi_output in enumerate(api_output_formatted_list0):
@@ -448,9 +449,20 @@ def include_fields_from_gsw(list_fields_to_include,api_output_formatted_list0,va
             api_output_formatted_list0[ilist][ivar]['data']        = []
             api_output_formatted_list0[ilist][ivar]['levels'] = []
 
+        
         for i,idata in enumerate(bfr_data_salt):
-            bfr_SA = gsw.conversions.SA_from_SP(SP=bfr_data_salt[i], p=bfr_data_levels[i], lon=bfr_data_lon[i], lat=bfr_data_lat[i])
-            bfr_CT = gsw.conversions.CT_from_t(SA=bfr_SA, t=bfr_data_temp[i], p=bfr_data_levels[i])
+            bfrbfr_salt = bfr_data_salt[i]
+            bfrbfr_salt = [np.nan if i is None else i for i in bfrbfr_salt]
+            
+            bfrbfr_temp = bfr_data_temp[i]
+            bfrbfr_temp = [np.nan if i is None else i for i in bfrbfr_temp]
+            
+            bfrbfr_levs = bfr_data_levels[i]
+            bfrbfr_levs = [np.nan if i is None else i for i in bfrbfr_levs]
+            
+            bfr_SA = gsw.conversions.SA_from_SP(SP=bfrbfr_salt, p=bfrbfr_levs,
+                                                lon=bfr_data_lon[i], lat=bfr_data_lat[i])
+            bfr_CT = gsw.conversions.CT_from_t(SA=bfr_SA, t=bfrbfr_temp, p=bfrbfr_levs)
             
             if 'absolute_salinity' in list_fields_to_include:
                 api_output_formatted_list0[ilist]['absolute_salinity']['data'].append(bfr_SA)
@@ -469,7 +481,7 @@ def include_fields_from_gsw(list_fields_to_include,api_output_formatted_list0,va
                 api_output_formatted_list0[ilist]['potential_density']['levels']=bfr_data_levels
                 
             if 'Nsquared' in list_fields_to_include:
-                bfr_N =gsw.stability.Nsquared(SA=bfr_SA, CT=bfr_CT, p=bfr_data_levels[i], lat=bfr_data_lat[i], axis=0)
+                bfr_N =gsw.stability.Nsquared(SA=bfr_SA, CT=bfr_CT, p=bfrbfr_levs, lat=bfr_data_lat[i], axis=0)
                 #print(bfr_N)
                 api_output_formatted_list0[ilist]['Nsquared']['data'].append(bfr_N[0])
                 api_output_formatted_list0[ilist]['Nsquared']['levels'].append(bfr_N[1])
