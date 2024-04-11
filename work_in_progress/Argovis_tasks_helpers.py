@@ -522,8 +522,8 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
                 
             if 'conservative_temperature' in list_fields_to_include:
                 api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']=bfr_CT_xar.to_dataset()
-                api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']['data']=api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']['SA']
-                api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']=api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray'].drop_vars(['SA'])
+                api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']['data']=api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']['CT']
+                api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']=api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray'].drop_vars(['CT'])
                 
             if 'potential_density' in list_fields_to_include:
                 bfr_PD_xar = gsw_xar.density.sigma0(SA=bfr_SA_xar, CT=bfr_CT_xar)+1000
