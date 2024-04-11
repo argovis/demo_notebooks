@@ -14,6 +14,8 @@ from argovisHelpers import helpers as avh
 import xarray as xr
 import gsw
 
+import gsw_xarray as gsw_xar
+
 # get the correct route, given the collection name
 def get_route(collection_name):
     
@@ -202,15 +204,19 @@ def format_api_output(api_output,selection_params,varname,index_collection,API_K
                 # create xarray
                 d_ind = np.array([list(range(1,len(api_output)+1))]*len(selection_params['interp_levels'])).transpose().tolist()
                 d_lev = [selection_params['interp_levels']]*len(api_output)
-
+                
+#                 print(np.shape(d))
+#                 print(np.shape(d_ind))
+#                 print(np.shape(d_lev))
+               
                 data_dict = {'data': np.array(d).flatten().tolist(),'levels': np.array(d_lev).flatten().tolist(),'index':np.array(d_ind).flatten().tolist()
                         } 
                 data_df = pandas.DataFrame(data_dict)   
                 df_rows = pandas.DataFrame(data_df).set_index(["levels","index"])
                 xar     = xr.Dataset.from_dataframe(df_rows)
-                xar.assign(longitude=(['index'],np.array(api_output_formatted['longitude'])))
-                xar.assign(latitude=(['index'],np.array(api_output_formatted['latitude'])))
-                xar.assign(timestamp=(['index'],np.array(api_output_formatted['timestamp'])))
+                xar     = xar.assign(longitude=(['index'],np.array(api_output_formatted['longitude'])))
+                xar     = xar.assign(latitude=(['index'],np.array(api_output_formatted['latitude'])))
+                xar     = xar.assign(timestamp=(['index'],np.array(api_output_formatted['timestamp'])))
 
                 api_output_formatted['data_xarray'] = xar
         elif 'grids' in selection_params['collections'][index_collection]:
@@ -356,7 +362,7 @@ def api_output_formatted_list_1var_plot_profiles(api_output_formatted_list):
             else:
                 flag_xarray = False
             if 'data' in i_api_output_formatted.keys() or flag_xarray:
-                plt.figure(figsize=(7,8))
+                plt.figure(figsize=(8,9))
                 if 'data' in i_api_output_formatted.keys():
                     for i,idata in enumerate(i_api_output_formatted['data']):
                         plt.plot(idata,i_api_output_formatted['levels'][i],'k')
@@ -408,7 +414,7 @@ def api_output_formatted_list_1var_plot_horizontal_and_time_ave(api_output_forma
             checkwhy
     
     for inum,inum_var in enumerate(figure_vars[0]):
-        plt.figure(figsize=(6,8))
+        plt.figure(figsize=(8,9))
         leg = []
         for i,i_api_output_formatted_all in enumerate(api_output_formatted_list):
         
@@ -431,17 +437,20 @@ def api_output_formatted_list_1var_plot_horizontal_and_time_ave(api_output_forma
                 leg.append(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']+time_info)
     plt.legend(leg)
     plt.show()
-
-def include_fields_from_gsw(list_fields_to_include,api_output_formatted_list0,varname_temperature,varname_salinity):
+    
+def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_output_formatted_list0,varname_temperature,varname_salinity):
     # list_fields_to_include = ['potential_density','Nsquared','absolute_salinity','conservative_temperature']
     for ilist,iapi_output in enumerate(api_output_formatted_list0):
+        
+        ##### first let's include gsw fields for the raw profile data
         # calculate potential density from 'data'
-        bfr_data_temp = iapi_output[varname_temperature]['data']
-        bfr_data_salt = iapi_output[varname_salinity]['data']
-        bfr_data_levels =iapi_output[varname_salinity]['levels']
+        bfr_data_temp   = copy.deepcopy(iapi_output[varname_temperature]['data'])
+        bfr_data_salt   = copy.deepcopy(iapi_output[varname_salinity]['data'])
+        bfr_data_levels =copy.deepcopy(iapi_output[varname_salinity]['levels'])
 
-        bfr_data_lon  = iapi_output[varname_salinity]['longitude']
-        bfr_data_lat  = iapi_output[varname_salinity]['latitude']
+        bfr_data_lon    = copy.deepcopy(iapi_output[varname_salinity]['longitude'])
+        bfr_data_lat    = copy.deepcopy(iapi_output[varname_salinity]['latitude'])
+        bfr_data_tstamp = copy.deepcopy(iapi_output[varname_salinity]['timestamp'])
         
         # initialize new fields
         for ivar in list_fields_to_include:
@@ -486,6 +495,65 @@ def include_fields_from_gsw(list_fields_to_include,api_output_formatted_list0,va
                 api_output_formatted_list0[ilist]['Nsquared']['data'].append(bfr_N[0])
                 api_output_formatted_list0[ilist]['Nsquared']['levels'].append(bfr_N[1])
         
+        ##### now let's compute the new fields starting from the vertically integrated profiles, if they are there
+        if 'data_xarray' in iapi_output[varname_temperature].keys():
+            #print(iapi_output[varname_temperature]['data_xarray'])
+            bfr_temp_xar = iapi_output[varname_temperature]['data_xarray']['data']
+            bfr_salt_xar = iapi_output[varname_salinity]['data_xarray']['data']
+            bfr_lons_xar = np.tile(bfr_data_lon,(np.shape(bfr_temp_xar.values)[0],1))
+            bfr_lats_xar = np.tile(bfr_data_lat,(np.shape(bfr_temp_xar.values)[0],1))
+            bfr_levs_xar = np.tile(iapi_output[varname_temperature]['data_xarray'].coords['levels'].values,(np.shape(bfr_temp_xar)[1],1)).transpose()
+            
+            bfr_xar = copy.deepcopy(iapi_output[varname_temperature]['data_xarray'])
+            bfr_xar['data_salt'] = iapi_output[varname_salinity]['data_xarray']['data']
+            bfr_xar['data_lons'] = (("levels","index"),bfr_lons_xar)
+            bfr_xar['data_lats'] = (("levels","index"),bfr_lats_xar)
+            bfr_xar['data_levs'] = (("levels","index"),bfr_levs_xar)
+            
+            bfr_SA_xar = gsw_xar.conversions.SA_from_SP(SP=bfr_xar['data_salt'], p=bfr_xar['data_levs'],
+                                                lon=bfr_xar['data_lons'], lat=bfr_xar['data_lats'])
+            
+            bfr_CT_xar = gsw_xar.conversions.CT_from_t(SA=bfr_SA_xar, t=bfr_xar['data'], p=bfr_xar['data_levs'])
+
+            if 'absolute_salinity' in list_fields_to_include:
+                api_output_formatted_list0[ilist]['absolute_salinity']['data_xarray']=bfr_SA_xar.to_dataset()
+                api_output_formatted_list0[ilist]['absolute_salinity']['data_xarray']['data']=api_output_formatted_list0[ilist]['absolute_salinity']['data_xarray']['SA']
+                api_output_formatted_list0[ilist]['absolute_salinity']['data_xarray']=api_output_formatted_list0[ilist]['absolute_salinity']['data_xarray'].drop_vars(['SA'])
+                
+            if 'conservative_temperature' in list_fields_to_include:
+                api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']=bfr_CT_xar.to_dataset()
+                api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']['data']=api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']['SA']
+                api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']=api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray'].drop_vars(['SA'])
+                
+            if 'potential_density' in list_fields_to_include:
+                bfr_PD_xar = gsw_xar.density.sigma0(SA=bfr_SA_xar, CT=bfr_CT_xar)+1000
+                api_output_formatted_list0[ilist]['potential_density']['data_xarray']=bfr_PD_xar.to_dataset()
+                api_output_formatted_list0[ilist]['potential_density']['data_xarray']['data']=api_output_formatted_list0[ilist]['potential_density']['data_xarray']['sigma0']
+                api_output_formatted_list0[ilist]['potential_density']['data_xarray']=api_output_formatted_list0[ilist]['potential_density']['data_xarray'].drop_vars(['sigma0'])
+                
+            if 'Nsquared' in list_fields_to_include:
+                bfr_N2xar =gsw_xar.stability.Nsquared(SA=bfr_SA_xar, CT=bfr_CT_xar, p=bfr_xar['data_levs'], lat=bfr_xar['data_lats'])
+                # bfr_N2xar is a tuple, let's now create the xarray dataset                
+                d_ind = np.array([list(range(1,np.shape(bfr_N2xar[0])[1]+1))]*np.shape(bfr_N2xar[0])[0]).tolist()
+                
+#                 print(np.shape(bfr_N2xar[0]))
+#                 print(np.shape(bfr_N2xar[1]))
+#                 print(np.shape(np.array(d_ind)))
+                
+                bfr_N_data_dict = {'data': bfr_N2xar[0].flatten().tolist(),'levels': bfr_N2xar[1].flatten().tolist(),'index':np.array(d_ind).flatten().tolist()
+                        } 
+                bfr_N_data_df = pandas.DataFrame(bfr_N_data_dict)   
+                bfr_N_df_rows = pandas.DataFrame(bfr_N_data_df).set_index(["levels","index"])
+                bfr_N_xar     = xr.Dataset.from_dataframe(bfr_N_df_rows)
+                api_output_formatted_list0[ilist]['Nsquared']['data_xarray']=bfr_N_xar
+                
+            for ivar in list_fields_to_include:
+                api_output_formatted_list0[ilist][ivar]['data_xarray']=api_output_formatted_list0[ilist][ivar]['data_xarray'].assign(longitude=(['index'],np.array(bfr_data_lon)))
+                api_output_formatted_list0[ilist][ivar]['data_xarray']=api_output_formatted_list0[ilist][ivar]['data_xarray'].assign(latitude=(['index'],np.array(bfr_data_lat)))
+                api_output_formatted_list0[ilist][ivar]['data_xarray']=api_output_formatted_list0[ilist][ivar]['data_xarray'].assign(timestamp=(['index'],np.array(bfr_data_tstamp)))
+                
+                
+        ##### finally let's include additional info for the new variables
         if 'absolute_salinity' in list_fields_to_include:
             api_output_formatted_list0[ilist]['absolute_salinity']['varname']='absolute_salinity'
             api_output_formatted_list0[ilist]['absolute_salinity']['varname_title']='Absolute salinity'
@@ -515,4 +583,5 @@ def include_fields_from_gsw(list_fields_to_include,api_output_formatted_list0,va
             api_output_formatted_list0[ilist][ivar]['region_tag']=iapi_output[varname_salinity]['region_tag']
             api_output_formatted_list0[ilist][ivar]['startDate']=iapi_output[varname_salinity]['startDate']
             api_output_formatted_list0[ilist][ivar]['endDate']=iapi_output[varname_salinity]['endDate']
+            
     return(api_output_formatted_list0)
