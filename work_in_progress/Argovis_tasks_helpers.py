@@ -28,16 +28,17 @@ def get_route(collection_name):
 def show_variable_names_for_collections(collections_list,API_KEY,verbose=False):
     vars_list = []
     for icollection in collections_list:
-        print('>>>>> '+icollection)
+        # 
 
         bfr = avh.query(icollection+'/vocabulary', options={'parameter': 'data'}, verbose='true',apikey=API_KEY, apiroot=get_route(icollection)) 
         if verbose:
+            print('>>>>> '+icollection)
             print(bfr)
         vars_list.append(bfr)
         
     return vars_list
 
-def list_values_for_parameter_to_api_query(selection_params,API_KEY):
+def list_values_for_parameter_to_api_query(selection_params,API_KEY,verbose=False):
     values_for_param = {}
     # list all the values for the parameter of interest
     vocab_params = {"parameter": selection_params['parameter_name']}
@@ -48,23 +49,27 @@ def list_values_for_parameter_to_api_query(selection_params,API_KEY):
         values_for_param[icollection]['param_vals_extra'] = {}
                     
     for icollection in selection_params['collections']:
-        print('>>>>>>>>>>>>>>> ' + icollection + ' <<<<<<<<<<<<<<<<<')
         param_vals = avh.query(icollection+'/vocabulary', options=vocab_params, apikey=API_KEY, apiroot=get_route(icollection))
-        print(param_vals)
+        
+        if verbose:
+            print('>>>>>>>>>>>>>>> ' + icollection + ' <<<<<<<<<<<<<<<<<')
+            print(param_vals)
         
         values_for_param[icollection]['param_vals'] = param_vals
         # for woceline, we need to list the section_start_date as it is needed for querying the woceline occupation
         if selection_params['parameter_name'] == 'woceline':
             
             for i in param_vals:
-                print('>>>>> ' + i + ' occupations:')
+                if verbose:
+                    print('>>>>> ' + i + ' occupations:')
                 i_vals = avh.query(icollection+'/meta', options={"woceline":i}, apikey=API_KEY, apiroot=get_route(icollection))
                 
                 values_for_param[icollection]['param_vals_extra'][i]={}
                 values_for_param[icollection]['param_vals_extra'][i]['time_boundaris']=[]
                 for ii in i_vals:
                     for iii in ii['occupancies']:
-                        print(iii['time_boundaries'])
+                        if verbose:
+                            print(iii['time_boundaries'])
                         values_for_param[icollection]['param_vals_extra'][i]['time_boundaris'].append(iii['time_boundaries'])
     return values_for_param
 
