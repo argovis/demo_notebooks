@@ -29,21 +29,44 @@ def show_variable_names_for_collections(collections_list,API_KEY,verbose=False):
     vars_list = []
     for icollection in collections_list:
         print('>>>>> '+icollection)
-        try:
-            bfr = avh.query(icollection+'/vocabulary', options={'parameter': 'data'}, verbose='true',apikey=API_KEY, apiroot=get_route(icollection)) 
-            if verbose:
-                print(bfr)
-            vars_list.append(bfr)
-        except:
-            print('No data parameter for vocabulary query')
-        try:
-            bfr = avh.query(icollection+'/vocabulary', verbose='true',apikey=API_KEY, apiroot=get_route(icollection))
-            if verbose:
-                print(*bfr[0]['data'],sep=',')
-            vars_list.append(bfr[0]['data'])
-        except:
-            print('Needs data parameter for vocabulary query')
+
+        bfr = avh.query(icollection+'/vocabulary', options={'parameter': 'data'}, verbose='true',apikey=API_KEY, apiroot=get_route(icollection)) 
+        if verbose:
+            print(bfr)
+        vars_list.append(bfr)
+        
     return vars_list
+
+def list_values_for_parameter_to_api_query(selection_params,API_KEY):
+    values_for_param = {}
+    # list all the values for the parameter of interest
+    vocab_params = {"parameter": selection_params['parameter_name']}
+    
+    for icollection in selection_params['collections']:
+        values_for_param[icollection] = {}
+        values_for_param[icollection]['param_vals'] = []
+        values_for_param[icollection]['param_vals_extra'] = {}
+                    
+    for icollection in selection_params['collections']:
+        print('>>>>>>>>>>>>>>> ' + icollection + ' <<<<<<<<<<<<<<<<<')
+        param_vals = avh.query(icollection+'/vocabulary', options=vocab_params, apikey=API_KEY, apiroot=get_route(icollection))
+        print(param_vals)
+        
+        values_for_param[icollection]['param_vals'] = param_vals
+        # for woceline, we need to list the section_start_date as it is needed for querying the woceline occupation
+        if selection_params['parameter_name'] == 'woceline':
+            
+            for i in param_vals:
+                print('>>>>> ' + i + ' occupations:')
+                i_vals = avh.query(icollection+'/meta', options={"woceline":i}, apikey=API_KEY, apiroot=get_route(icollection))
+                
+                values_for_param[icollection]['param_vals_extra'][i]={}
+                values_for_param[icollection]['param_vals_extra'][i]['time_boundaris']=[]
+                for ii in i_vals:
+                    for iii in ii['occupancies']:
+                        print(iii['time_boundaries'])
+                        values_for_param[icollection]['param_vals_extra'][i]['time_boundaris'].append(iii['time_boundaries'])
+    return values_for_param
 
 # interpolate profiles (this can be used also for grids/, as they are stored as profiles
 def interpolate_profiles(profile, levels_varname, levels_new):
@@ -126,7 +149,7 @@ def xarray_regional_mean(dxr, form='area'):
 
 # create a map from lists of longitudes and latitudes    
 def map_lons_lats(lons,lats,dx=20,dy=20):
-    fig = plt.figure()
+    fig = plt.figure(figsize=(8,9))
     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
     lon_range = np.arange(np.floor(min(lons))-dx,np.ceil(max(lons))+dx,10)
     lat_range = np.arange(np.floor(min(lats))-dy,np.ceil(max(lats))+dy,10)
@@ -149,25 +172,7 @@ def map_lons_lats(lons,lats,dx=20,dy=20):
     lat_formatter = cticker.LatitudeFormatter()
     ax.yaxis.set_major_formatter(lat_formatter)
 
-def list_values_for_parameter_to_api_query(selection_params,API_KEY):
-    # list all the values for the parameter of interest
-    vocab_params = {
-        "parameter": selection_params['parameter_name'] 
-    }
-    for icollection in selection_params['collections']:
-        print('>>>>>>>>>>>>>>> ' + icollection + ' <<<<<<<<<<<<<<<<<')
-        param_vals = avh.query(icollection+'/vocabulary', options=vocab_params, apikey=API_KEY, apiroot=get_route(icollection))
-        print(param_vals)
-        # for woceline, we need to list the section_start_date as it is needed for querying the woceline occupation
-        if selection_params['parameter_name'] == 'woceline':
-            for i in param_vals:
-                print('>>>>> ' + i + ' occupations:')
-                i_vals = avh.query(icollection+'/meta', options={"woceline":i}, apikey=API_KEY, apiroot=get_route(icollection))
-                for ii in i_vals:
-                    for iii in ii['occupancies']:
-                        print(iii['time_boundaries'])
-
-# function to format the output of an api query, to make visualizing it easier
+# function to format the output of an api query, to make visualizing it easier; if levels for vertical interpolation are provided, the function also does that (storing the output in a dedicated xarray)
 def format_api_output(api_output,selection_params,varname,index_collection,API_KEY=''):
 # api_output is the output of an API query
 # varname is the name of the variable we would like to save in the formatted output
@@ -445,6 +450,33 @@ def api_output_formatted_list_1var_plot_horizontal_and_time_ave(api_output_forma
     plt.legend(leg)
     plt.show()
     
+
+def api_output_formatted_list_parameter_2d_plot(api_output_formatted_list,var2use_for_sorting):
+# var2use_for_sorting examples:
+# woceline: look at the map for the profile locations and choose what makes most sense between longitude and latitude
+# argo platform: 'timestamp' is generally a good choice; the cycle number would be good too, yet 
+# it is not currently stored in api_output_formatted_list
+    for i in api_output_formatted_list:
+        for ivar in i.keys():
+            if 'data_xarray' in i[ivar].keys():
+                for j in ['sorted']:
+                    d2pl = copy.deepcopy(i[ivar]['data_xarray']['data'])
+                    if j == 'sorted': 
+                        d2pl = d2pl.sortby(i[ivar]['data_xarray'][var2use_for_sorting], ascending=True)
+
+                    plt.figure()
+                    plt.pcolor(i[ivar]['data_xarray'][var2use_for_sorting].values,i[ivar]['data_xarray'].coords['levels'].values,d2pl.values)
+                    plt.colorbar()
+                    plt.ylabel('Vertical level, dbar or m')
+                    plt.xlabel(var2use_for_sorting[0].upper()+var2use_for_sorting[1::])
+                    if var2use_for_sorting == 'latitude':
+                        plt.xlabel(var2use_for_sorting[0].upper()+var2use_for_sorting[1::]+', degrees north')
+                    if var2use_for_sorting == 'longitude':
+                        plt.xlabel(var2use_for_sorting[0].upper()+var2use_for_sorting[1::]+', degrees east')
+                    plt.title(ivar+' ('+j+')')
+                    plt.gca().invert_yaxis()
+    
+    
 def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_output_formatted_list0,varname_temperature,varname_salinity):
     # list_fields_to_include = ['potential_density','Nsquared','absolute_salinity','conservative_temperature']
     for ilist,iapi_output in enumerate(api_output_formatted_list0):
@@ -610,8 +642,8 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
             api_output_formatted_list0[ilist]['Nsquared']['data_units']='1/s^2'
 
         for ivar in api_output_formatted_list0[ilist].keys():
-            api_output_formatted_list0[ilist][ivar]['longitude']=bfr_data_levels
-            api_output_formatted_list0[ilist][ivar]['latitude']=bfr_data_levels
+            api_output_formatted_list0[ilist][ivar]['longitude']=iapi_output[varname_salinity]['longitude']
+            api_output_formatted_list0[ilist][ivar]['latitude']=iapi_output[varname_salinity]['latitude']
 
             api_output_formatted_list0[ilist][ivar]['collection']=iapi_output[varname_salinity]['collection']
             api_output_formatted_list0[ilist][ivar]['region_tag']=iapi_output[varname_salinity]['region_tag']
@@ -619,3 +651,23 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
             api_output_formatted_list0[ilist][ivar]['endDate']=iapi_output[varname_salinity]['endDate']
             
     return(api_output_formatted_list0)
+
+# def show_variable_names_for_collections(collections_list,API_KEY,verbose=False):
+#     vars_list = []
+#     for icollection in collections_list:
+#         print('>>>>> '+icollection)
+#         try:
+#             bfr = avh.query(icollection+'/vocabulary', options={'parameter': 'data'}, verbose='true',apikey=API_KEY, apiroot=get_route(icollection)) 
+#             if verbose:
+#                 print(bfr)
+#             vars_list.append(bfr)
+#         except:
+#             print('No data parameter for vocabulary query')
+#         try:
+#             bfr = avh.query(icollection+'/vocabulary', verbose='true',apikey=API_KEY, apiroot=get_route(icollection))
+#             if verbose:
+#                 print(*bfr[0]['data'],sep=',')
+#             vars_list.append(bfr[0]['data'])
+#         except:
+#             print('Needs data parameter for vocabulary query')
+#     return vars_list
