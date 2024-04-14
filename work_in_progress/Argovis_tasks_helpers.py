@@ -195,6 +195,7 @@ def format_api_output(api_output,selection_params,varname,index_collection,API_K
             
             #? the next 2 lines should be adjusted to see if we can avoid assuming the correct index is '0' for the variable name (we should be able to query the legend?)
             api_output_formatted['data']     =[x['data'][x['data_info'][0].index(varname)] for x in api_output]
+            #print([x['data_info'][0] for x in api_output])
             api_output_formatted['levels']   =[x['data'][x['data_info'][0].index(selection_params['varname_levels'][index_collection])] for x in api_output]
             api_output_formatted['timestamp']=[dateutil.parser.isoparse(x['timestamp']) for x in api_output]
             api_output_formatted['longitude']=[x['geolocation']['coordinates'][0] for x in api_output]
@@ -298,9 +299,8 @@ def get_api_output_formatted_list_1var_for_regions_and_timeranges(selection_para
                         api_output_formatted_all[ivar]['region_type']=selection_params['regions_type'][i]
                         api_output_formatted_all[ivar]['region_tag']=selection_params['regions_tag'][i]
                         
-                        api_output_formatted_all[ivar]['varname_title']=selection_params['varname_title']
-
-                    
+                        #api_output_formatted_all[ivar]['varname_title']=selection_params['varname_title']
+                        api_output_formatted_all[ivar]['varname_title']=ivar[0].upper()+ivar[1::]
                     #print(api_output_formatted.keys())
                 api_output_formatted_list.append(api_output_formatted_all)
     return api_output_formatted_list
