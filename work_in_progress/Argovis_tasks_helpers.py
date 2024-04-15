@@ -456,7 +456,7 @@ def api_output_formatted_list_1var_plot_profiles(api_output_formatted_list):
                 plt.xlabel(i_api_output_formatted['varname_title']+', '+ i_api_output_formatted['data_units'],size=14)
                 plt.gca().invert_yaxis()
                 
-def api_output_formatted_list_1var_plot_map(api_output_formatted_list,ilev=0,itime=0):
+def api_output_formatted_list_1var_plot_map(api_output_formatted_list,ilev=0,itime=0,cmap='viridis'):
     # plot the map for one timestep/level for each of the gridded products
     # ilev and itime are integers representing the index of intrest
     for i_api_output_formatted_all in api_output_formatted_list:
@@ -470,9 +470,9 @@ def api_output_formatted_list_1var_plot_map(api_output_formatted_list,ilev=0,iti
                     plt.figure()
                     # if the time index is not indicated, plot time average
                     if not isinstance(itime,int):
-                        i_api_output_formatted['data_xarray']['data'][:,:,ilev,:].mean(dim='timestamp').plot()
+                        i_api_output_formatted['data_xarray']['data'][:,:,ilev,:].mean(dim='timestamp').plot(cmap=cmap)
                     else:
-                        i_api_output_formatted['data_xarray']['data'][:,:,ilev,itime].plot()
+                        i_api_output_formatted['data_xarray']['data'][:,:,ilev,itime].plot(cmap=cmap)
                     
                     time_info = ''
                     if i_api_output_formatted['startDate'] and i_api_output_formatted['endDate']:
