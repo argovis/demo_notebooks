@@ -137,6 +137,40 @@ def grids_to_xarray(grids,grids_meta,varname):
     df_rows = pandas.DataFrame(data_df).set_index(["latitude", "longitude","levels","timestamp"])
     return xr.Dataset.from_dataframe(df_rows)
 
+# function to create xarray object from timeseries/ query (it assumes the timeseries
+# in the database entry is store for one specific level)
+def timeseries_to_xarray_for1lev_case(timeseries,timeseries_meta,varname):
+    # this is for timeseries data that only have one level
+    # if there is no levels indicated in the metadata, zero is assigned to levels (for timeseries there is always one level at the moment)
+    for ii,i in enumerate(timeseries_meta):
+        if 'levels' not in timeseries_meta[ii].keys():
+            timeseries_meta[ii]['levels'] = [0]
+
+    data_list        = []
+    data_list_lev    = []
+    data_list_lon    = []
+    data_list_lat    = []
+    data_list_tstamp = []
+    for x in timeseries:
+        for tx,x_time in enumerate(x['timeseries']):
+            data_list.append(x['data'][x['data_info'][0].index(varname)][tx])
+            
+            data_list_lev.append(timeseries_meta[ii]['levels'][0])
+            data_list_lon.append(x['geolocation']['coordinates'][0])
+            data_list_lat.append(x['geolocation']['coordinates'][1])
+            data_list_tstamp.append(x_time)
+
+    bfr_lon = np.array(data_list_lon)
+    bfr_lon[bfr_lon<20] = bfr_lon[bfr_lon<20]+360
+
+    data_list_lon = bfr_lon.tolist()
+
+    data_dict = {'data': data_list,'latitude':data_list_lat, 'longitude': data_list_lon,'levels': data_list_lev,'timestamp': data_list_tstamp} 
+
+    data_df = pandas.DataFrame(data_dict)   
+    df_rows = pandas.DataFrame(data_df).set_index(["latitude", "longitude","levels","timestamp"])
+    return xr.Dataset.from_dataframe(df_rows)
+
 # area weigthed regional mean starting from an xarray
 def xarray_regional_mean(dxr, form='area'):
     # given an xarray dataset <dxr> with latitudes and longitudes as dimensions,
@@ -233,25 +267,37 @@ def format_api_output(api_output,selection_params,varname,index_collection,API_K
 
                 api_output_formatted['data_xarray'] = xar
         elif 'grids' in selection_params['collections'][index_collection]:
-                # for grids, we only create data_xarray
-                       
-                for igm in api_output[0]['metadata']:
-                    try:
-                        # look in different meta_data documents until you find the one that has units for the variable of interest
-                        grids_opt  = {
-                            "id": igm
-                            }
-                        grids_meta = avh.query('grids/meta',options=grids_opt,verbose='true', apikey=API_KEY, apiroot=get_route(selection_params['collections'][index_collection]))
-                        #? the next line should be adjusted to see if we can avoid assuming the correct index is '0' for the variable name and for the units (we should be able to query the legend?)
-                        api_output_formatted['data_units'] = grids_meta[0]['data_info'][2][grids_meta[0]['data_info'][0].index(varname)][0] 
-                        
-                    except:
-                        igm
+            # for grids, we only create data_xarray
+
+            for igm in api_output[0]['metadata']:
+                try:
+                    # look in different meta_data documents until you find the one that has units for the variable of interest
+                    grids_opt  = {
+                        "id": igm
+                        }
+                    grids_meta = avh.query('grids/meta',options=grids_opt,verbose='true', apikey=API_KEY, apiroot=get_route(selection_params['collections'][index_collection]))
+                    #? the next line should be adjusted to see if we can avoid assuming the correct index is '0' for the variable name and for the units (we should be able to query the legend?)
+                    api_output_formatted['data_units'] = grids_meta[0]['data_info'][2][grids_meta[0]['data_info'][0].index(varname)][0] 
+
+                except:
+                    igm
 #                         print(grids_meta['data_info'][0])
 #                         print(grids_meta['data_info'][2])
-                
-                api_output_formatted['data_xarray'] = grids_to_xarray(api_output,grids_meta,varname)
-                
+
+            api_output_formatted['data_xarray'] = grids_to_xarray(api_output,grids_meta,varname)
+        elif 'timeseries' in selection_params['collections'][index_collection]:
+            # this below works as is, if there is only one metadata file and it includes the info needed
+            # (i.e. data_units for all the variables and levels... if levels is absent, it will be assigned zero)
+            metaQuery = {
+                        'id': api_output[0]['metadata'] 
+                    }
+
+            timeseries_meta = avh.query('timeseries/meta', options=metaQuery, apikey=API_KEY, apiroot=get_route(selection_params['collections'][index_collection]),verbose=True)
+
+            api_output_formatted['data_units'] = timeseries_meta[0]['data_info'][2][timeseries_meta[0]['data_info'][0].index(varname)][0] 
+                    
+            api_output_formatted['data_xarray'] = timeseries_to_xarray_for1lev_case(timeseries=api_output,timeseries_meta=timeseries_meta,varname=varname)
+
     return api_output_formatted
 
 # function to get a list of formatted api output
@@ -422,11 +468,23 @@ def api_output_formatted_list_1var_plot_map(api_output_formatted_list,ilev=0,iti
             if 'data_xarray' in i_api_output_formatted.keys():
                 if 'longitude' in list(i_api_output_formatted['data_xarray'].coords) and 'latitude' in list(i_api_output_formatted['data_xarray'].coords):
                     plt.figure()
-                    i_api_output_formatted['data_xarray']['data'][:,:,ilev,itime].plot()
+                    # if the time index is not indicated, plot time average
+                    if not isinstance(itime,int):
+                        i_api_output_formatted['data_xarray']['data'][:,:,ilev,:].mean(dim='timestamp').plot()
+                    else:
+                        i_api_output_formatted['data_xarray']['data'][:,:,ilev,itime].plot()
+                    
                     time_info = ''
                     if i_api_output_formatted['startDate'] and i_api_output_formatted['endDate']:
-                        time_info = '\n'+i_api_output_formatted['startDate'][0:10]+' to '+i_api_output_formatted['endDate'][0:10]
-                    plt.title(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+','+i_api_output_formatted['region_tag']+time_info)
+                        if not isinstance(itime,int):
+                            time_info = '\n'+i_api_output_formatted['startDate'][0:10]+' to '+i_api_output_formatted['endDate'][0:10]
+                            
+                        else:
+                            time_info = '\n'+i_api_output_formatted['data_xarray'].coords['timestamp'].values[itime][0:10]
+                    level_info = ''
+                    if isinstance(ilev,int):
+                        level_info = 'level '+'\n'+str(i_api_output_formatted['data_xarray'].coords['levels'].values[ilev])
+                    plt.title(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']+time_info)
 
 def api_output_formatted_list_1var_plot_horizontal_and_time_ave(api_output_formatted_list,colors):     
     # plot horizontal average using xarray objects
