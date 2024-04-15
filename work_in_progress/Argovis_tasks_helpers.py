@@ -258,6 +258,14 @@ def format_api_output(api_output,selection_params,varname,index_collection,API_K
 def get_api_output_formatted_list_1var_for_regions_and_timeranges(selection_params,API_KEY):
     # for each collection, region, and time range of interest, get api formatted output and store all in a list
     api_output_formatted_list = []
+    
+    # for consistency across datasets, if varnames_qc was not indicated for a collection, we will create it and assign it empty items
+    adding_varnames_qc = False
+    if 'varnames_qc' not in selection_params.keys():
+        selection_params['varnames_qc'] = []
+        for i in selection_params['varnames']:
+            selection_params['varnames_qc'].append('')
+        adding_varnames_qc = True
 
     for icl,icollection in enumerate(selection_params['collections']):
         for i,ireg in enumerate(selection_params['regions']):
@@ -303,6 +311,11 @@ def get_api_output_formatted_list_1var_for_regions_and_timeranges(selection_para
                         api_output_formatted_all[ivar]['varname_title']=ivar[0].upper()+ivar[1::]
                     #print(api_output_formatted.keys())
                 api_output_formatted_list.append(api_output_formatted_all)
+                
+                # let's drop anything that was added just for consistency with other products
+    if adding_varnames_qc:
+        del selection_params["varnames_qc"]
+                    
     return api_output_formatted_list
 
 
