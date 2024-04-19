@@ -406,6 +406,10 @@ def get_api_output_formatted_list_1var_for_parameter(selection_params,API_KEY):
                 else:
                     api_output_formatted_all[ivar]['region_tag']= ''
                     
+                if 'parameter' in selection_params.keys():
+                    api_output_formatted_all[ivar]['parameter']=selection_params['parameter'][i]
+                    api_output_formatted_all[ivar]['parameter_name']=selection_params['parameter_name']
+                    
                 api_output_formatted_all[ivar]['startDate']     = min(api_output_formatted_all[ivar]['timestamp']).strftime("%Y-%m-%d")
                 api_output_formatted_all[ivar]['endDate']       = max(api_output_formatted_all[ivar]['timestamp']).strftime("%Y-%m-%d")
                 api_output_formatted_all[ivar]['varname_title'] = ivar[0].upper()+ivar[1::]
@@ -421,9 +425,17 @@ def api_output_formatted_list_1var_plot_lons_lats_map(api_output_formatted_list,
             #print(i_api_output_formatted.keys())
             if 'data' in i_api_output_formatted.keys():
                 map_lons_lats(i_api_output_formatted['longitude'], i_api_output_formatted['latitude'],dx=20,dy=20)
-                plt.title(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']+'\n'+i_api_output_formatted['startDate'][0:10]+' to '+i_api_output_formatted['endDate'][0:10])
+                
+                bfr_tag = ''
+                if i_api_output_formatted['region_tag']:
+                    bfr_tag = i_api_output_formatted['region_tag']
+                 
+                if 'parameter_name' in i_api_output_formatted.keys():
+                    bfr_tag = i_api_output_formatted['parameter_name']+' '+i_api_output_formatted['parameter']
+                    
+                plt.title(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+bfr_tag+'\n'+i_api_output_formatted['startDate'][0:10]+' to '+i_api_output_formatted['endDate'][0:10])
                 if flag_map_for_only_one_var:
-                    return
+                    break
 
 def api_output_formatted_list_1var_plot_profiles(api_output_formatted_list):
     # let's plot data for each of the point data (if the selected collections are not 
@@ -521,10 +533,19 @@ def api_output_formatted_list_1var_plot_horizontal_and_time_ave(api_output_forma
                 time_info = ''
                 if i_api_output_formatted['startDate'] and i_api_output_formatted['endDate']:
                     time_info = '\n'+i_api_output_formatted['startDate'][0:10]+' to '+i_api_output_formatted['endDate'][0:10]
-
-                leg.append(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']+time_info)
-    plt.legend(leg)
-    plt.show()
+                
+                bfr_tag = ''
+                if i_api_output_formatted['region_tag']:
+                    bfr_tag = i_api_output_formatted['region_tag']
+                 
+                if 'parameter_name' in i_api_output_formatted.keys():
+                    bfr_tag = i_api_output_formatted['parameter_name']+' '+i_api_output_formatted['parameter']
+                 
+                leg.append(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+bfr_tag+time_info)
+                del bfr_tag
+        plt.legend(leg)
+#     print(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']+time_info)
+        plt.show()
     
 
 def api_output_formatted_list_parameter_2d_plot(api_output_formatted_list,var2use_for_sorting):
@@ -549,7 +570,7 @@ def api_output_formatted_list_parameter_2d_plot(api_output_formatted_list,var2us
                         plt.xlabel(var2use_for_sorting[0].upper()+var2use_for_sorting[1::]+', degrees north')
                     if var2use_for_sorting == 'longitude':
                         plt.xlabel(var2use_for_sorting[0].upper()+var2use_for_sorting[1::]+', degrees east')
-                    plt.title(ivar+' ('+j+')')
+                    plt.title(ivar+' ('+j+')'+' '+i[ivar]['parameter_name']+' '+i[ivar]['parameter'])
                     plt.gca().invert_yaxis()
     
     
@@ -725,7 +746,10 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
             api_output_formatted_list0[ilist][ivar]['region_tag']=iapi_output[varname_salinity]['region_tag']
             api_output_formatted_list0[ilist][ivar]['startDate']=iapi_output[varname_salinity]['startDate']
             api_output_formatted_list0[ilist][ivar]['endDate']=iapi_output[varname_salinity]['endDate']
-            
+            if 'parameter' in iapi_output[varname_salinity].keys():
+                api_output_formatted_list0[ilist][ivar]['parameter']=iapi_output[varname_salinity]['parameter']
+                api_output_formatted_list0[ilist][ivar]['parameter_name']=iapi_output[varname_salinity]['parameter_name']
+                
     return(api_output_formatted_list0)
 
 # def show_variable_names_for_collections(collections_list,API_KEY,verbose=False):
