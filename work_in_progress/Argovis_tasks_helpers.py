@@ -94,8 +94,13 @@ def interpolate_profiles(profile, levels_varname, levels_new):
             data_names.append(key)
             
             # interpolate avoiding extrapolation
-            interpolated_data.append(scipy.interpolate.PchipInterpolator(levels4interpolation, data, extrapolate=False)(levels_new).tolist())
-    
+            if len(data) > 1:
+                interpolated_data.append(scipy.interpolate.PchipInterpolator(levels4interpolation, data, extrapolate=False)(levels_new).tolist())
+            else:
+                a = np.empty((len(levels_new),))
+                a[:] = np.nan
+                interpolated_data.append(a.tolist())
+                    
     interpolated_levels = list(zip(*interpolated_data))
     data = [{data_names[i]:d[i] for i in range(len(data_names))} for d in interpolated_levels]
     interpolated_profile = copy.deepcopy(profile) # don't mutate the original
@@ -220,6 +225,8 @@ def format_api_output(api_output,selection_params,varname,index_collection,API_K
     api_output_formatted = {}
     api_output_formatted['collection'] = selection_params['collections'][index_collection]
     api_output_formatted['varname']    = varname
+    api_output_formatted['varname_temperature'] = selection_params['varname_temperature'][index_collection]
+    api_output_formatted['varname_salinity']    = selection_params['varname_salinity'][index_collection]
     
     if api_output:
         # create a list with information for non gridded products
@@ -242,7 +249,7 @@ def format_api_output(api_output,selection_params,varname,index_collection,API_K
             if 'interp_levels' in selection_params.keys():
                 interpolated_profiles = []
                 for idata in api_output:
-                             interpolated_profiles.append(interpolate_profiles(profile=idata, levels_varname=selection_params['varname_levels'][index_collection], levels_new=selection_params['interp_levels']))
+                    interpolated_profiles.append(interpolate_profiles(profile=idata, levels_varname=selection_params['varname_levels'][index_collection], levels_new=selection_params['interp_levels']))
                         
                 # if more than one variable is included in api_output, this will only store the one indicated in varname above
                 d = [x['data'] for x in interpolated_profiles]
@@ -336,6 +343,12 @@ def get_api_output_formatted_list_1var_for_regions_and_timeranges(selection_para
                     iend = ''
                     if 'glodap' in icollection:
                         iparam['endDate'] = '1000-01-02T00:00:00.000Z'
+                # if extra_params are indicated in selection_params['extra_query_params'], let's include them
+                if 'extra_query_params' in selection_params.keys():
+                    if selection_params['extra_query_params'][icl]:
+                        for iextra in selection_params['extra_query_params'][icl].keys():
+                            iparam[iextra] = selection_params['extra_query_params'][icl][iextra]
+                    
                 api_output = avh.query(icollection, options=iparam, verbose='true',apikey=API_KEY, apiroot=get_route(icollection)) 
                 
                 api_output_formatted_all = {}
@@ -390,6 +403,12 @@ def get_api_output_formatted_list_1var_for_parameter(selection_params,API_KEY):
         if selection_params['parameter_name'] == 'woceline':
             # how the user assigns the start date should be improved
             iparam['section_start_date'] = selection_params['section_start_date'][i]
+            
+        # if extra_params are indicated in selection_params['extra_query_params'], let's include them
+        if 'extra_query_params' in selection_params.keys():
+            if selection_params['extra_query_params'][i]:
+                for iextra in selection_params['extra_query_params'][i].keys():
+                    iparam[iextra] = selection_params['extra_query_params'][i][iextra]
 
         # let's query data from the selected object
         api_output = avh.query(icollection, options=iparam, verbose='true',apikey=API_KEY, apiroot=get_route(icollection))
@@ -521,10 +540,14 @@ def api_output_formatted_list_1var_plot_horizontal_and_time_ave(api_output_forma
             i_api_output_formatted =  i_api_output_formatted_all[figure_vars[i][inum]]
     
             if 'data_xarray' in i_api_output_formatted.keys():
-                if 'longitude' in list(i_api_output_formatted['data_xarray'].coords) and 'latitude' in list(i_api_output_formatted['data_xarray'].coords):
+                
+                if 'longitude' in i_api_output_formatted['data_xarray']['data'].dims and 'latitude' in i_api_output_formatted['data_xarray']['data'].dims: #list(i_api_output_formatted['data_xarray'].coords)
                     horiz_ave = xarray_regional_mean(i_api_output_formatted['data_xarray'], form='area').mean(dim='timestamp')
-                elif 'index' in list(i_api_output_formatted['data_xarray'].coords):
+                elif 'index' in i_api_output_formatted['data_xarray']['data'].dims:
                     horiz_ave = i_api_output_formatted['data_xarray'].mean(dim='index')
+#                 elif i_api_output_formatted['data_xarray']['data'].dims == ('levels',):
+#                     horiz_ave = i_api_output_formatted['data_xarray']
+                    
                 #print(horiz_ave.sizes)
                 horiz_ave['data'].plot(y='levels',color=colors[i],yincrease=False)
                 plt.ylabel('Vertical level (m or dbar)',size=14)
@@ -543,7 +566,7 @@ def api_output_formatted_list_1var_plot_horizontal_and_time_ave(api_output_forma
                  
                 leg.append(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+bfr_tag+time_info)
                 del bfr_tag
-        plt.legend(leg)
+        plt.legend(leg, bbox_to_anchor = (1, 0.5))
 #     print(i_api_output_formatted['collection']+' '+i_api_output_formatted['varname']+', '+i_api_output_formatted['region_tag']+time_info)
         plt.show()
     
@@ -574,93 +597,100 @@ def api_output_formatted_list_parameter_2d_plot(api_output_formatted_list,var2us
                     plt.gca().invert_yaxis()
     
     
-def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_output_formatted_list0,varname_temperature,varname_salinity):
+def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_output_formatted_list0):
     # list_fields_to_include = ['potential_density','Nsquared','absolute_salinity','conservative_temperature']
     for ilist,iapi_output in enumerate(api_output_formatted_list0):
         
         ##### first let's include gsw fields for the raw profile data
         # calculate potential density from 'data'
+        varname_salinity = iapi_output[list(iapi_output.keys())[0]]['varname_salinity']
+        varname_temperature = iapi_output[list(iapi_output.keys())[0]]['varname_temperature']
         if varname_salinity not in iapi_output.keys():
-            print('>>> ' + api_output_formatted_list0[ilist]['collection:'])
+            print(api_output_formatted_list0[ilist].keys())
+            print('>>> ' + api_output_formatted_list0[ilist]['collection'])
             print(varname_salinity + ' is not available, hence gsw cannot be used for SA')
             break
         
-        bfr_data_salt   = copy.deepcopy(iapi_output[varname_salinity]['data'])
-        bfr_data_levels =copy.deepcopy(iapi_output[varname_salinity]['levels'])
+        if 'data' in iapi_output[varname_temperature].keys():
+            bfr_data_salt   = copy.deepcopy(iapi_output[varname_salinity]['data'])
+            bfr_data_levels =copy.deepcopy(iapi_output[varname_salinity]['levels'])
 
-        bfr_data_lon    = copy.deepcopy(iapi_output[varname_salinity]['longitude'])
-        bfr_data_lat    = copy.deepcopy(iapi_output[varname_salinity]['latitude'])
-        bfr_data_tstamp = copy.deepcopy(iapi_output[varname_salinity]['timestamp'])
-            
-        if varname_temperature in iapi_output.keys():
-            bfr_data_temp   = copy.deepcopy(iapi_output[varname_temperature]['data'])
-        else:
-            print(varname_temperature + ' is not available, hence gsw cannot be used for CT')   
-            
-        # initialize new fields
-        for ivar in list_fields_to_include:
-            api_output_formatted_list0[ilist][ivar]={}
-            api_output_formatted_list0[ilist][ivar]['data']        = []
-            api_output_formatted_list0[ilist][ivar]['levels'] = []
+            bfr_data_lon    = copy.deepcopy(iapi_output[varname_salinity]['longitude'])
+            bfr_data_lat    = copy.deepcopy(iapi_output[varname_salinity]['latitude'])
+            bfr_data_tstamp = copy.deepcopy(iapi_output[varname_salinity]['timestamp'])
 
-        
-        for i,idata in enumerate(bfr_data_salt):
-            
-            bfrbfr_salt = bfr_data_salt[i]
-            bfrbfr_salt = [np.nan if i is None else i for i in bfrbfr_salt]
-            
-            bfrbfr_levs = bfr_data_levels[i]
-            bfrbfr_levs = [np.nan if i is None else i for i in bfrbfr_levs]
-            
             if varname_temperature in iapi_output.keys():
-                bfrbfr_temp = bfr_data_temp[i]
-                bfrbfr_temp = [np.nan if i is None else i for i in bfrbfr_temp]
-            
-            bfr_SA = gsw.conversions.SA_from_SP(SP=bfrbfr_salt, p=bfrbfr_levs,
-                                                lon=bfr_data_lon[i], lat=bfr_data_lat[i])
-            
-            if varname_temperature in iapi_output.keys():
-                bfr_CT = gsw.conversions.CT_from_t(SA=bfr_SA, t=bfrbfr_temp, p=bfrbfr_levs)
-            
-            if 'absolute_salinity' in list_fields_to_include:
-                api_output_formatted_list0[ilist]['absolute_salinity']['data'].append(bfr_SA)
-                # include e.g. levels, long, lat for consistency with other variables
-                api_output_formatted_list0[ilist]['absolute_salinity']['levels']=bfr_data_levels
-                
-            if 'conservative_temperature' in list_fields_to_include:
+                bfr_data_temp   = copy.deepcopy(iapi_output[varname_temperature]['data'])
+            else:
+                print(varname_temperature + ' is not available, hence gsw cannot be used for CT')   
+
+            # initialize new fields
+            for ivar in list_fields_to_include:
+                api_output_formatted_list0[ilist][ivar]={}
+                api_output_formatted_list0[ilist][ivar]['data']        = []
+                api_output_formatted_list0[ilist][ivar]['levels'] = []
+
+
+            for i,idata in enumerate(bfr_data_salt):
+
+                bfrbfr_salt = bfr_data_salt[i]
+                bfrbfr_salt = [np.nan if i is None else i for i in bfrbfr_salt]
+
+                bfrbfr_levs = bfr_data_levels[i]
+                bfrbfr_levs = [np.nan if i is None else i for i in bfrbfr_levs]
+
                 if varname_temperature in iapi_output.keys():
-                    api_output_formatted_list0[ilist]['conservative_temperature']['data'].append(bfr_CT)
-                    # include e.g. levels, long, lat for consistency with other variables
-                    api_output_formatted_list0[ilist]['conservative_temperature']['levels']=bfr_data_levels
-                else:
-                    api_output_formatted_list0[ilist].drop_vars(['conservative_temperature'])
+                    bfrbfr_temp = bfr_data_temp[i]
+                    bfrbfr_temp = [np.nan if i is None else i for i in bfrbfr_temp]
 
-            if 'potential_density' in list_fields_to_include:
-                if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
-                    bfr_PD = gsw.density.sigma0(SA=bfr_SA, CT=bfr_CT)
-                    api_output_formatted_list0[ilist]['potential_density']['data'].append(bfr_PD+1000)
+                bfr_SA = gsw.conversions.SA_from_SP(SP=bfrbfr_salt, p=bfrbfr_levs,
+                                                    lon=bfr_data_lon[i], lat=bfr_data_lat[i])
+
+                if varname_temperature in iapi_output.keys():
+                    bfr_CT = gsw.conversions.CT_from_t(SA=bfr_SA, t=bfrbfr_temp, p=bfrbfr_levs)
+
+                if 'absolute_salinity' in list_fields_to_include:
+                    api_output_formatted_list0[ilist]['absolute_salinity']['data'].append(bfr_SA)
                     # include e.g. levels, long, lat for consistency with other variables
-                    api_output_formatted_list0[ilist]['potential_density']['levels']=bfr_data_levels
-                else:
-                    api_output_formatted_list0[ilist].drop_vars(['potential_density'])
-                    
-            if 'Nsquared' in list_fields_to_include:
-                if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
-                    bfr_N =gsw.stability.Nsquared(SA=bfr_SA, CT=bfr_CT, p=bfrbfr_levs, lat=bfr_data_lat[i], axis=0)
-                #print(bfr_N)
-                    api_output_formatted_list0[ilist]['Nsquared']['data'].append(bfr_N[0])
-                    api_output_formatted_list0[ilist]['Nsquared']['levels'].append(bfr_N[1])
-                else:
-                    api_output_formatted_list0[ilist].drop_vars(['Nsquared'])
-                    
+                    api_output_formatted_list0[ilist]['absolute_salinity']['levels']=bfr_data_levels
+
+                if 'conservative_temperature' in list_fields_to_include:
+                    if varname_temperature in iapi_output.keys():
+                        api_output_formatted_list0[ilist]['conservative_temperature']['data'].append(bfr_CT)
+                        # include e.g. levels, long, lat for consistency with other variables
+                        api_output_formatted_list0[ilist]['conservative_temperature']['levels']=bfr_data_levels
+                    else:
+                        api_output_formatted_list0[ilist].drop_vars(['conservative_temperature'])
+
+                if 'potential_density' in list_fields_to_include:
+                    if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
+                        bfr_PD = gsw.density.sigma0(SA=bfr_SA, CT=bfr_CT)
+                        api_output_formatted_list0[ilist]['potential_density']['data'].append(bfr_PD+1000)
+                        # include e.g. levels, long, lat for consistency with other variables
+                        api_output_formatted_list0[ilist]['potential_density']['levels']=bfr_data_levels
+                    else:
+                        api_output_formatted_list0[ilist].drop_vars(['potential_density'])
+
+                if 'Nsquared' in list_fields_to_include:
+                    if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
+                        bfr_N =gsw.stability.Nsquared(SA=bfr_SA, CT=bfr_CT, p=bfrbfr_levs, lat=bfr_data_lat[i], axis=0)
+                    #print(bfr_N)
+                        api_output_formatted_list0[ilist]['Nsquared']['data'].append(bfr_N[0])
+                        api_output_formatted_list0[ilist]['Nsquared']['levels'].append(bfr_N[1])
+                    else:
+                        api_output_formatted_list0[ilist].drop_vars(['Nsquared'])
+
         ##### now let's compute the new fields starting from the vertically integrated profiles, if they are there
         if 'data_xarray' in iapi_output[varname_temperature].keys():
             
             if varname_salinity in iapi_output.keys():
                 bfr_xar = copy.deepcopy(iapi_output[varname_salinity]['data_xarray'])
-                bfr_xar['data_lons'] = (("levels","index"),np.tile(bfr_data_lon,(np.shape(bfr_xar['data'].values)[0],1)))
-                bfr_xar['data_lats'] = (("levels","index"),np.tile(bfr_data_lat,(np.shape(bfr_xar['data'].values)[0],1)))
-                bfr_xar['data_levs'] = (("levels","index"),np.tile(iapi_output[varname_salinity]['data_xarray'].coords['levels'].values,(np.shape(bfr_xar['data'].values)[1],1)).transpose())
+                
+                if 'levels' in bfr_xar['data'].dims and 'index' in bfr_xar['data'].dims:
+                    bfr_xar['data_lons'] = (("levels","index"),np.tile(bfr_data_lon,(np.shape(bfr_xar['data'].values)[0],1)))
+                    bfr_xar['data_lats'] = (("levels","index"),np.tile(bfr_data_lat,(np.shape(bfr_xar['data'].values)[0],1)))
+                    bfr_xar['data_levs'] = (("levels","index"),np.tile(iapi_output[varname_salinity]['data_xarray'].coords['levels'].values,(np.shape(bfr_xar['data'].values)[1],1)).transpose())
+                    
             else:
                 print('>>> ' + api_output_formatted_list0[ilist]['collection:'])
                 print(varname_salinity + ' is not available, hence gsw cannot be used for SA')
