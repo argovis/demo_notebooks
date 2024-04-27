@@ -9,10 +9,11 @@ dependencies:
   - numpy=1.22.3
   - xarray=2022.11.0
   - matplotlib=3.5.1
-  - shapely=1.7.1
+  - shapely=1.8.0
   - pip:
     - svgpath2mpl==1.0.0
-    - argovisHelpers==0.0.22
+    - argovisHelpers==0.0.23
     - scipy==1.9.3
     - gsw==3.6.17
     - gsw-xarray==0.3.0
+    - geopandas==0.14.3
