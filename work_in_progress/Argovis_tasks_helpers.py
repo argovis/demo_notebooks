@@ -229,6 +229,10 @@ def format_api_output(api_output,selection_params,varname,index_collection,API_K
     api_output_formatted['varname_salinity']    = selection_params['varname_salinity'][index_collection]
     
     if api_output:
+        # let's print some info on the screen regarding what is returned from the API query (even if this function does not currently store everything)
+        print('Here is the info returned for ' + selection_params['collections'][index_collection] + ' (if you would like to store more parameters, please include more in selection_params[''additional_info_to_save'']):')
+        print(api_output[0].keys())
+        
         # create a list with information for non gridded products
         if 'grids' not in selection_params['collections'][index_collection] and 'timeseries' not in selection_params['collections'][index_collection]:
             # if more than one variable is included in api_output, this will only store the one indicated in varname above
@@ -241,6 +245,11 @@ def format_api_output(api_output,selection_params,varname,index_collection,API_K
             api_output_formatted['timestamp']=[dateutil.parser.isoparse(x['timestamp']) for x in api_output]
             api_output_formatted['longitude']=[x['geolocation']['coordinates'][0] for x in api_output]
             api_output_formatted['latitude'] =[x['geolocation']['coordinates'][1] for x in api_output]
+
+            if 'additional_info_to_save'  in selection_params.keys() and selection_params['additional_info_to_save'][index_collection]:
+                for i_params_to_save in selection_params['additional_info_to_save'][index_collection]:
+                    api_output_formatted[i_params_to_save] =[x[i_params_to_save] for x in api_output]
+                                        
 
             #? the next line should be adjusted to see if we can avoid assuming the correct index is '0' for the variable name and for the units (we should be able to query the legend?)
             api_output_formatted['data_units']=api_output[0]['data_info'][2][api_output[0]['data_info'][0].index(varname)][0]
