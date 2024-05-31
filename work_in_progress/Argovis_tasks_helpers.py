@@ -671,6 +671,15 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
                     else:
                         api_output_formatted_list0[ilist].drop_vars(['conservative_temperature'])
 
+                if 'potential_temperature' in list_fields_to_include:
+                    if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
+                        bfr_PT = gsw.conversions.pt0_from_t(SA=bfr_SA, t=bfrbfr_temp, p=bfrbfr_levs)
+                        api_output_formatted_list0[ilist]['potential_temperature']['data'].append(bfr_PT)
+                        # include e.g. levels, long, lat for consistency with other variables
+                        api_output_formatted_list0[ilist]['potential_temperature']['levels']=bfr_data_levels
+                    else:
+                        api_output_formatted_list0[ilist].drop_vars(['potential_temperature'])
+
                 if 'potential_density' in list_fields_to_include:
                     if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
                         bfr_PD = gsw.density.sigma0(SA=bfr_SA, CT=bfr_CT)
@@ -679,7 +688,17 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
                         api_output_formatted_list0[ilist]['potential_density']['levels']=bfr_data_levels
                     else:
                         api_output_formatted_list0[ilist].drop_vars(['potential_density'])
+                
+                if 'density' in list_fields_to_include:
+                    if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
+                        bfr_D = gsw.density.rho(SA=bfr_SA, CT=bfr_CT, p=bfrbfr_levs)
+                        api_output_formatted_list0[ilist]['density']['data'].append(bfr_D)
+                        # include e.g. levels, long, lat for consistency with other variables
+                        api_output_formatted_list0[ilist]['density']['levels']=bfr_data_levels
+                    else:
+                        api_output_formatted_list0[ilist].drop_vars(['density'])
 
+                        
                 if 'Nsquared' in list_fields_to_include:
                     if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
                         bfr_N =gsw.stability.Nsquared(SA=bfr_SA, CT=bfr_CT, p=bfrbfr_levs, lat=bfr_data_lat[i], axis=0)
@@ -723,13 +742,26 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
                     api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']['data']=api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']['CT']
                     api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray']=api_output_formatted_list0[ilist]['conservative_temperature']['data_xarray'].drop_vars(['CT'])
                 
+            if 'potential_temperature' in list_fields_to_include:
+                if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
+                    bfr_PT_xar = gsw_xar.conversions.pt0_from_t(SA=bfr_SA_xar, t=bfr_xar['data_temp'], p=bfr_xar['data_levs'])
+                    api_output_formatted_list0[ilist]['potential_temperature']['data_xarray']=bfr_PT_xar.to_dataset()
+                    
+                    print(api_output_formatted_list0[ilist]['potential_temperature']['data_xarray'])
+                    api_output_formatted_list0[ilist]['potential_temperature']['data_xarray']['data']=api_output_formatted_list0[ilist]['potential_temperature']['data_xarray']['pt0']
+                    api_output_formatted_list0[ilist]['potential_temperature']['data_xarray']=api_output_formatted_list0[ilist]['potential_temperature']['data_xarray'].drop_vars(['pt0'])
             if 'potential_density' in list_fields_to_include:
                 if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
                     bfr_PD_xar = gsw_xar.density.sigma0(SA=bfr_SA_xar, CT=bfr_CT_xar)+1000
                     api_output_formatted_list0[ilist]['potential_density']['data_xarray']=bfr_PD_xar.to_dataset()
                     api_output_formatted_list0[ilist]['potential_density']['data_xarray']['data']=api_output_formatted_list0[ilist]['potential_density']['data_xarray']['sigma0']
-                    api_output_formatted_list0[ilist]['potential_density']['data_xarray']=api_output_formatted_list0[ilist]['potential_density']['data_xarray'].drop_vars(['sigma0'])
-                
+                    api_output_formatted_list0[ilist]['potential_density']['data_xarray']=api_output_formatted_list0[ilist]['potential_density']['data_xarray'].drop_vars(['sigma0'])    
+            if 'density' in list_fields_to_include:
+                if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
+                    bfr_D_xar = gsw_xar.density.rho(SA=bfr_SA_xar, CT=bfr_CT_xar, p=bfr_xar['data_levs'])
+                    api_output_formatted_list0[ilist]['density']['data_xarray']=bfr_D_xar.to_dataset()
+                    api_output_formatted_list0[ilist]['density']['data_xarray']['data']=api_output_formatted_list0[ilist]['density']['data_xarray']['rho']
+                    api_output_formatted_list0[ilist]['density']['data_xarray']=api_output_formatted_list0[ilist]['density']['data_xarray'].drop_vars(['rho'])    
             if 'Nsquared' in list_fields_to_include:
                 if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
                     bfr_N2xar =gsw_xar.stability.Nsquared(SA=bfr_SA_xar, CT=bfr_CT_xar, p=bfr_xar['data_levs'], lat=bfr_xar['data_lats'])
@@ -766,10 +798,20 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
             api_output_formatted_list0[ilist]['conservative_temperature']['varname_title']='Conservative temperature'
             api_output_formatted_list0[ilist]['conservative_temperature']['data_units']='degC'
 
+        if 'potential_temperature' in api_output_formatted_list0[ilist].keys():
+            api_output_formatted_list0[ilist]['potential_temperature']['varname']='potential_temperature'
+            api_output_formatted_list0[ilist]['potential_temperature']['varname_title']='Potential temperature'
+            api_output_formatted_list0[ilist]['potential_temperature']['data_units']='degC'
+
         if 'potential_density' in api_output_formatted_list0[ilist].keys():
             api_output_formatted_list0[ilist]['potential_density']['varname']='potential_density'
             api_output_formatted_list0[ilist]['potential_density']['varname_title']='Potential Density'
             api_output_formatted_list0[ilist]['potential_density']['data_units']='kg/m^3'
+
+        if 'density' in api_output_formatted_list0[ilist].keys():
+            api_output_formatted_list0[ilist]['density']['varname']='density'
+            api_output_formatted_list0[ilist]['density']['varname_title']='Density'
+            api_output_formatted_list0[ilist]['density']['data_units']='kg/m^3'
 
         if 'Nsquared' in api_output_formatted_list0[ilist].keys():
             # Frequency N is in radians per second
