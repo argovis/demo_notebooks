@@ -605,7 +605,7 @@ def api_output_formatted_list_parameter_2d_plot(api_output_formatted_list,var2us
                         plt.xlabel(var2use_for_sorting[0].upper()+var2use_for_sorting[1::]+', degrees north')
                     if var2use_for_sorting == 'longitude':
                         plt.xlabel(var2use_for_sorting[0].upper()+var2use_for_sorting[1::]+', degrees east')
-                    plt.title(ivar+' ('+j+')'+' '+i[ivar]['parameter_name']+' '+i[ivar]['parameter'])
+                    plt.title(ivar+', '+i[ivar]['data_units']+' ('+j+')'+' '+i[ivar]['parameter_name']+' '+i[ivar]['parameter'])
                     plt.gca().invert_yaxis()
     
     
@@ -835,6 +835,79 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
                 api_output_formatted_list0[ilist][ivar]['parameter_name']=iapi_output[varname_salinity]['parameter_name']
                 
     return(api_output_formatted_list0)
+
+# function to compute AOU
+# based on book by Sarmiento and Gruber (originally from Garcia and Gordon, 1992)
+def AOU_umol_per_kg_estimate(i_pT,i_S,i_rho,i_O2):
+    A0 = 2.00907
+    A1 = 3.22014
+    A2 = 4.05010
+    A3 = 4.94457
+    A4 = -0.256847
+    A5 = 3.88767
+    B0 = -6.24523e-3
+    B1 = -7.37614e-3
+    B2 = -1.03410e-2
+    B3 = -8.17083e-3
+    C0 = -4.88682e-7
+
+    Ts = np.log((298.15-i_pT)/(273.15+i_pT))
+    l  = A0*Ts/Ts + A1*Ts + A2*(Ts**2) + A3*(Ts**3) + A4*(Ts**4) + A5*(Ts**5) + i_S*(B0 + B1*Ts + B2*(Ts**2) + B3*(Ts**3)) + C0*(i_S**2)
+
+    O2_eq_mmol_per_m3 = (1000/22.3916)*np.exp(l)
+
+    
+    O2_eq_umol_per_kg = O2_eq_mmol_per_m3*i_rho/1000
+    
+    AOU_umol_per_kg   = O2_eq_umol_per_kg - i_O2
+    
+    return AOU_umol_per_kg
+
+# function to include AOU in 
+def api_output_formatted_list_include_AOU(api_output_formatted_list,varname_oxygen_in_umol_per_kg,varname_pot_temp_degC,varname_insitu_salinity,varname_insitu_density):
+
+    for iind,i in enumerate(api_output_formatted_list):
+
+        api_output_formatted_list[iind]['AOU'] = {}
+        api_output_formatted_list[iind]['AOU']['data'] = []
+
+        for idata_type in ['data','data_xarray']:
+
+            pT = i[varname_pot_temp_degC][idata_type]
+            S  = i[varname_insitu_salinity][idata_type]
+            rho= i[varname_insitu_density][idata_type]
+            O2 = i[varname_oxygen_in_umol_per_kg][idata_type]
+
+            if idata_type=='data':
+                api_output_formatted_list[iind]['AOU'][idata_type] = []
+
+                for iitem,i_pT in enumerate(pT):
+                    i_pT  = np.array(i_pT)
+                    i_S   = np.array(S[iitem])
+                    i_rho = np.array(rho[iitem])
+                    i_O2  = np.array(O2[iitem])
+
+                    #bfr_AOU = AOU_umol_per_kg_estimate(i_pT,i_S,i_rho,i_O2)
+                    api_output_formatted_list[iind]['AOU'][idata_type].append(AOU_umol_per_kg_estimate(i_pT,i_S,i_rho,i_O2))
+
+                api_output_formatted_list[iind]['AOU']['levels']=api_output_formatted_list[iind][varname_pot_temp_degC]['levels']
+
+            elif idata_type=='data_xarray':
+                testAOU = AOU_umol_per_kg_estimate(pT['data'].to_numpy(),S['data'].to_numpy(),rho['data'].to_numpy(),O2['data'].to_numpy())
+                api_output_formatted_list[iind]['AOU'][idata_type] = copy.deepcopy(api_output_formatted_list[iind][varname_pot_temp_degC][idata_type])
+
+                testAOUxar = xr.DataArray(testAOU, coords={'levels': api_output_formatted_list[iind][varname_pot_temp_degC][idata_type]['levels'].values, 'index': api_output_formatted_list[iind][varname_pot_temp_degC][idata_type]['index'].values},
+                 dims=['levels', 'index'])
+
+                api_output_formatted_list[iind]['AOU'][idata_type]['data'] = testAOUxar
+
+        for ivar_add in api_output_formatted_list[iind][varname_pot_temp_degC].keys():
+            if ivar_add not in ['data', 'levels', 'data_xarray', 'varname', 'varname_title', 'data_units']:
+                api_output_formatted_list[iind]['AOU'][ivar_add] = api_output_formatted_list[iind]['potential_temperature'][ivar_add]
+        api_output_formatted_list[iind]['AOU']['varname']= 'AOU'
+        api_output_formatted_list[iind]['AOU']['varname_title']='AOU'
+        api_output_formatted_list[iind]['AOU']['data_units']='micromole/kg'
+    return api_output_formatted_list
 
 # def show_variable_names_for_collections(collections_list,API_KEY,verbose=False):
 #     vars_list = []
