@@ -589,12 +589,15 @@ def api_output_formatted_list_parameter_2d_plot(api_output_formatted_list,var2us
         for ivar in i.keys():
             if 'data_xarray' in i[ivar].keys():
                 for j in ['sorted']:
-                    d2pl = copy.deepcopy(i[ivar]['data_xarray']['data'])
+                    #d2pl = copy.deepcopy(i[ivar]['data_xarray']['data'])
+                    d2pl = copy.deepcopy(i[ivar]['data_xarray'])
                     if j == 'sorted': 
-                        d2pl = d2pl.sortby(i[ivar]['data_xarray'][var2use_for_sorting], ascending=True)
+                        d2pl_sorted = d2pl.sortby(i[ivar]['data_xarray'][var2use_for_sorting], ascending=True)
 
                     plt.figure()
-                    plt.pcolor(i[ivar]['data_xarray'][var2use_for_sorting].values,i[ivar]['data_xarray'].coords['levels'].values,d2pl.values)
+                    
+                    #print(d2pl_sorted)
+                    plt.pcolor(d2pl_sorted[var2use_for_sorting].values,d2pl_sorted['levels'].values,d2pl_sorted['data'].values)
                     plt.colorbar()
                     plt.ylabel('Vertical level, dbar or m')
                     plt.xlabel(var2use_for_sorting[0].upper()+var2use_for_sorting[1::])
@@ -659,13 +662,13 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
                     bfr_CT = gsw.conversions.CT_from_t(SA=bfr_SA, t=bfrbfr_temp, p=bfrbfr_levs)
 
                 if 'absolute_salinity' in list_fields_to_include:
-                    api_output_formatted_list0[ilist]['absolute_salinity']['data'].append(bfr_SA)
+                    api_output_formatted_list0[ilist]['absolute_salinity']['data'].append(list(bfr_SA))
                     # include e.g. levels, long, lat for consistency with other variables
                     api_output_formatted_list0[ilist]['absolute_salinity']['levels']=bfr_data_levels
 
                 if 'conservative_temperature' in list_fields_to_include:
                     if varname_temperature in iapi_output.keys():
-                        api_output_formatted_list0[ilist]['conservative_temperature']['data'].append(bfr_CT)
+                        api_output_formatted_list0[ilist]['conservative_temperature']['data'].append(list(bfr_CT))
                         # include e.g. levels, long, lat for consistency with other variables
                         api_output_formatted_list0[ilist]['conservative_temperature']['levels']=bfr_data_levels
                     else:
@@ -674,7 +677,7 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
                 if 'potential_temperature' in list_fields_to_include:
                     if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
                         bfr_PT = gsw.conversions.pt0_from_t(SA=bfr_SA, t=bfrbfr_temp, p=bfrbfr_levs)
-                        api_output_formatted_list0[ilist]['potential_temperature']['data'].append(bfr_PT)
+                        api_output_formatted_list0[ilist]['potential_temperature']['data'].append(list(bfr_PT))
                         # include e.g. levels, long, lat for consistency with other variables
                         api_output_formatted_list0[ilist]['potential_temperature']['levels']=bfr_data_levels
                     else:
@@ -683,7 +686,7 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
                 if 'potential_density' in list_fields_to_include:
                     if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
                         bfr_PD = gsw.density.sigma0(SA=bfr_SA, CT=bfr_CT)
-                        api_output_formatted_list0[ilist]['potential_density']['data'].append(bfr_PD+1000)
+                        api_output_formatted_list0[ilist]['potential_density']['data'].append(list(bfr_PD+1000))
                         # include e.g. levels, long, lat for consistency with other variables
                         api_output_formatted_list0[ilist]['potential_density']['levels']=bfr_data_levels
                     else:
@@ -692,7 +695,7 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
                 if 'density' in list_fields_to_include:
                     if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
                         bfr_D = gsw.density.rho(SA=bfr_SA, CT=bfr_CT, p=bfrbfr_levs)
-                        api_output_formatted_list0[ilist]['density']['data'].append(bfr_D)
+                        api_output_formatted_list0[ilist]['density']['data'].append(list(bfr_D))
                         # include e.g. levels, long, lat for consistency with other variables
                         api_output_formatted_list0[ilist]['density']['levels']=bfr_data_levels
                     else:
@@ -703,7 +706,7 @@ def api_output_formatted_list_include_gsw_fields(list_fields_to_include,api_outp
                     if varname_temperature in iapi_output.keys() and varname_salinity in iapi_output.keys():
                         bfr_N =gsw.stability.Nsquared(SA=bfr_SA, CT=bfr_CT, p=bfrbfr_levs, lat=bfr_data_lat[i], axis=0)
                     #print(bfr_N)
-                        api_output_formatted_list0[ilist]['Nsquared']['data'].append(bfr_N[0])
+                        api_output_formatted_list0[ilist]['Nsquared']['data'].append(list(bfr_N[0]))
                         api_output_formatted_list0[ilist]['Nsquared']['levels'].append(bfr_N[1])
                     else:
                         api_output_formatted_list0[ilist].drop_vars(['Nsquared'])
