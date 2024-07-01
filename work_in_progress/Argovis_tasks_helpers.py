@@ -192,8 +192,8 @@ def xarray_regional_mean(dxr, form='area'):
         return dxr_weighted.mean(("longitude"))
 
 # create a map from lists of longitudes and latitudes    
-def map_lons_lats(lons,lats,dx=20,dy=20):
-    fig = plt.figure(figsize=(8,9))
+def map_lons_lats(lons,lats,dx=20,dy=20,fig_sz1=8,fig_sz2=9):
+    fig = plt.figure(figsize=(fig_sz1,fig_sz2))
     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
     lon_range = np.arange(np.floor(min(lons))-dx,np.ceil(max(lons))+dx,10)
     lat_range = np.arange(np.floor(min(lats))-dy,np.ceil(max(lats))+dy,10)

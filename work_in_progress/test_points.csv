@@ -1,0 +1,154 @@
+﻿Sta. #,Longitude,Latitude,FloatType/Crate,S/N,EEZ
+1,22o 00’ W,40o 36’ N,WHOI Core,S2A 7713,
+2,37o 00’ W,37o 06’ N,WHOI Core,S2A 7732,
+3,40o 00’ W,36o 12’ N,WHOI Core,S2A 7746,
+4,43o 00’ W,35o 06’ N,WHOI Core,S2A 7747,
+5,46o 00’ W,33o 54’ N,WHOI Core,S2A 7774,
+6,52o 00’ W,31o 12’ N,WHOI Core,S2A 7875,
+7,55o 00’ W,29o 48’ N,Deep,6108,
+8,57o 00’ W,28o 42’ N,Deep,6109,
+9,59o 00’ W,27o 36’ N,Deep,6110,
+10,61o 00’ W,26o 21’ N,Deep,6111,
+11,63o 00’ W,25o 06’ N,Deep,6112,
+12,65o 00’ W,23o 42’ N,Deep,6113,
+13,67o 00’ W,22o 30’ N,Deep,6115,
+14,73o 06’ W,14o 30’ N,,,Colombia
+15,73o 48’ W,14o 00’ N,,,Colombia
+16,74o 30’ W,13o 30’ N,SIO Core (Carib),3206,Colombia
+17,75o 12’ W,13o 00’ N,WHOI Core,S2A 7826,Colombia
+18,75o 54’ W,12o 27’ N,SIO Core (Carib),3214,Colombia
+19,76o 36’ W,11o 54’ N,WHOI Core,S2A 8727,Colombia
+20,77o 18’ W,11o 24’ N,SIO Core (Carib),3215,Colombia
+21,77o 48’ W,11o 00’ N,WHOI Core,S2A 7828,Panama
+22,78o 12’ W,10o 42’ N,WHOI Core,S2A 7734,Panama
+23,81o 00’ W,6o 36’ N,SIO Core,3219,Panama
+24,83o 24’ W,4o 30’ N,,,Colombia
+25,83o 51’ W,4o 00’ N,,,Colombia
+26,84o 18’ W,3o 30’ N,,,Colombia
+27,84o 45’ W,3o 00’ N,,,Colombia
+28,85o 12’ W,2o 30’ N,WHOI Core,S2A 7480,
+29,85o 21’ W,1o 30’ N,SIO Core IDGant,3245,
+30,85o 30’ W,0o 30’ N,WHOI BGC,1529,
+31,85o 39’ W,0o 30’ S,UW Core,21680 (C1),
+32,85o 48’ W,1o 30’ S,SIO Core,3220,
+33,85o 54’ W,2o 15’ S,WHOI Core,S2A 7490,
+34,86o 00’ W,3o 00’ S,SIO Core,3221,
+35,86o 39’ W,3o 30’ S,UW Core,21665 (C1),
+36,87o 12’ W,4o 00’ S,WHOI Core,S2A 7522,
+37,87o 54’ W,4o 30’ S,SIO Core,3224,
+38,88o 36’ W,5o 00’ S,UW Core,21917 (C2),
+39,89o 18’ W,5o 30’ S,WHOI BGC,1556,
+40,90o 48’ W,5o 00’ S,SIO Core,3225,
+41,92o 18’ W,4o 33’ S,SIO Core,3227,
+42,94o 00’ W,4o 00’ S,UW Core,21815 (C2),
+43,94o 36’ W,3o 00’ S,WHOI Core,S2A 7597,
+44,95o 36’ W,1o 00’ S,UW Core,21436 (C3),
+45,96o 36’ W,1o 00’ N,WHOI Core,S2A 7699,
+46,97o 39’ W,3o 00’ N,SIO Core,3228,
+47,98o 39’ W,5o 00’ N,UW Core,21115 (C3),
+48,99o 39’ W,7o 00’ N,UW Core,21529 (C4),
+49,100o 42’ W,9o 00’ N,SIO Core,3229,
+50,101o 48’ W,11o 00’ N,UW Core,21769 (C4),
+51,102o 54’ W,13o 00’ N,SIO Core,3230,
+52,103o 42’ W,14o 30’ N,UW Core,21835 (C5),
+53,104o 30’ W,16o 00’ N,SIO Core,3232,Mexico
+54,105o 54’ W,17o 00’ N,UW Core non-N2,21400 (C5),Mexico
+55,107o 18’ W,18o 00’ N,UW Core non-N2,21425 (C6),Mexico
+56,108o 30’ W,18o 48’ N,SIO Core,3233,Mexico
+57,110o 30’ W,20o 15’ N,UW Core non-N2,21416 (C6),Mexico
+58,111o 30’ W,21o 00’ N,UW Core non-N2,22095 (C7),Mexico
+59,112o 30’ W,22o 00’ N,SIO Core,3234,Mexico
+60,113o 30’ W,23o 00’ N,UW Core non-N2,22757 (C7),Mexico
+61,114o 30’ W,24o 00’ N,UW Core non-N2,22248 (C8),Mexico
+62,115o 30’ W,25o 00’ N,SIO Core,3235,Mexico
+63,116o 30’ W,26o 00’ N,UW Core non-N2,22060 (C8),Mexico
+64,117o 30’ W,27o 00’ N,UW Core non-N2,21662 (C9),Mexico
+65,119o 00’ W,28o 30’ N,UW Core non-N2,21347 (C9),Mexico
+66,127o 00’ W,35o 30’ N,,,
+67,130o 25’ W,36o 36’ N,UW Core,,
+68,133o 30’ W,37o 42’ N,SIO Core (Carib),3216,
+69,135o 00’ W,38o 12’ N,UW Core,,
+70,136o 45’ W,38o 48’ N,SIO Core (Carib),3217,
+71,138o 15’ W,39o 24’ N,UW Core,,
+72,140o 00’ W,40o 00’ N,BGC,,
+73,141o 00’ W,40o 03’ N,SIO Core (Carib),3218,
+74,142o 00’ W,40o 06’ N,UW Core,,
+75,144o 00’ W,40o 12’ N,SIO Core,3236,
+76,145o 00’ W,40o 15’ N,UW Core,,
+77,146o 00’ W,40o 18’ N,SIO Core,3237,
+78,147o 00’ W,40o 21’ N,UW Core,,
+79,148o 00’ W,40o 24’ N,SIO Core,3238,
+80,149o 00’ W,40o 27’ N,UW Core,,
+81,150o 00’ W,40o 30’ N,BGC,,
+82,151o 00’ W,40o 30’ N,SIO Core,3239,
+83,152o 00’ W,40o 27’ N,UW Core,,
+84,153o 00’ W,40o 24’ N,SIO Core,3241,
+85,154o 00’ W,40o 21’ N,UW Core,,
+86,155o 00’ W,40o 18’ N,SIO Core,3242,
+87,156o 00’ W,40o 15’ N,UW Core,,
+88,157o 00’ W,40o 12’ N,SIO Core,3243,
+89,158o 00’ W,40o 09’ N,UW Core,,
+90,159o 00’ W,40o 06’ N,SIO Core,3244,
+91,160o 00’ W,40o 00’ N,BGC,,
+92,162o 00’ W,39o 48’ N,UW Core,,
+93,164o 00’ W,39o 36’ N,SIO Core,3164,
+94,166o 00’ W,39o 24’ N,UW Core,,
+95,167o 00’ W,39o 18’ N,SIO Core,3222,
+96,168o 00’ W,39o 12’ N,UW Core,,
+97,170o 00’ W,39o 00’ N,BGC,,
+98,171o 00’ W,38o 42’ N,,,
+99,172o 00’ W,38o 24’ N,SIO Core,3223,
+100,174o 00’ W,37o 48’ N,SIO Core,3226,
+101,175o 00’ W,37o 30’ N,UW Core,,
+102,176o 00’ W,37o 12’ N,SIO Core,3231,
+103,177o 00’ W,36o 54’ N,SIO Core,3240,
+104,178o 00’ W,36o 36’ N,SIO Core,3247,
+105,179o 00’ W,36o 18’ N,UW Core,,
+106,180o 00’ E,36o 00’ N,SIO Core,3248,
+107,179o 00’ E,35o 36’ N,,,
+108,178o 00’ E,35o 12’ N,UW Core,,
+109,176o 00’ E,34o 24’ N,UW Core,,
+110,174o 00’ E,33o 36’ N,BGC,,
+111,172o 00’ E,32o 48’ N,SIO Core,3249,
+112,170o 00’ E,32o 00’ N,UW Core,,
+113,168o 30’ E,31o 00’ N,SIO Core,3250,
+114,167o 00’ E,30o 00’ N,UW Core,,
+115,166o 00’ E,28o 15’ N,SIO Core,3251,
+116,165o 00’ E,26o 30’ N,UW Core,,
+117,164o 00’ E,24o 45’ N,SIO Core,3252,
+118,163o 30’ E,23o 54’ N,UW Core,,
+119,163o 00’ E,23o 00’ N,BGC,,
+120,162o 30’ E,22o 12’ N,SIO Core,3253,
+121,162o 00’ E,21o 30’ N,SIO Core,3254,
+122,161o 30’ E,20o 12’ N,SIO Core,3255,
+123,161o 00’ E,19o 12’ N,UW Core,,
+124,160o 00’ E,17o 06’ N,,,
+125,159o 00’ E,15o 00’ N,BGC,,
+126,158o 00’ E,13o 00’ N,SIO Core,3256,
+127,157o 00’ E,11o 00’ N,UW Core,,
+128,158o 00’ E,9o 00’ N,SIO Core,3257,Micronesia
+129,159o 00’ E,7o 00’ N,SIO Core,3258,Micronesia
+130,160o 00’ E,5o 00’ N,SIO BGC,4002,Micronesia
+131,161o 00’ E,3o 00’ N,SIO Core,3259,Micronesia
+132,162o 00’ E,1o 00’ N,SIO Core,3260,
+133,162o 30’ E,1o 00’ S,,CSIRO,
+134,163o 00’ E,3o 00’ S,UW Core,,
+135,163o 12 E,3o 45’ S,SIO Core,3261,
+136,163o 24’ E,4o 30’ S,,CSIRO,
+137,164o 00’ E,7o 00’ S,SIO Core,3262,Solomon Is
+138,164o 30’ E,9o 00’ S, SIO BGC,4004,Solomon Is
+139,165o 00’ E,11o 00’ S,,CSIRO,Solomon Is
+140,165o 30’ E,13o 00’ S,SIO Core,SIO E1,Vanuatu
+141,166o 00’ E,15o 00’ S,UW Core,,Vanuatu
+142,166o 15’ E,16o 00’ S,,CSIRO,Vanuatu
+143,166o 30’ E,17o 00’ S,SIO Core,SIO E2,Vanuatu
+144,166o 45’ E,18o 00’ S,UW Core,,Vanuatu
+145,167o 06’ E,19o 30’ S,SIO Core,SIO E3,New Caledonia
+146,167o 24’ E,20o 30’ S,UW Core,,New Caledonia
+147,167o 54’ E,22o 30’ S,SIO Core,NZ E4,New Caledonia
+148,168o 30’ E,25o 00’ S,BGC,,New Caledonia
+149,169o 06’ E,27o 18’ S,,CSIRO,Australia
+150,169o 15’ E,28o 00’ S,,CSIRO,Australia
+151,169o 30’ E,29o 00’ S,,CSIRO,Australia
+152,170o 24’ E,32o 30’ S,BGC,,NZ
+153,170o 30’ E,33o 00’ S,SIO Core,NZ E5,NZ
