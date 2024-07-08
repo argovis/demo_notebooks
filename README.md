@@ -26,6 +26,7 @@ Once you have cloned the demo_notebooks repository:
   ```
 
   Please note that `path_to_files` is the full path to the `demo_notebooks` directory on your machine, e.g. `C:\Users\username\python_files\Argovis\demo_notebooks`.
+- After a moment, several URLs will be printed to the terminal. Copy the one beginning with http://127.0.0.1 to your browser of choice to access the notebook environment. 
 
 ## See Also
 
