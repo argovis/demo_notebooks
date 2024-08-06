@@ -5,7 +5,7 @@
 This repository contains notebooks meant to be followed by individuals who want to learn more about searching, downloading and processing data with Argovis. Start with [Intro to 
 Argovis](https://github.com/argovis/demo_notebooks/blob/main/Intro_to_Argovis.ipynb), and then follow along with any other notebooks that are relevant to your interests.
 
-## unning the notebooks using Docker
+## Running the notebooks using Docker
 Create a free Docker account at https://www.docker.com/ and install Docker (https://www.docker.com/products/docker-desktop/) on your laptop. Check that git is also installed on your laptop. Before moving forward, please make sure no other jupyter notebooks are running on your laptop. With Docker installed (and running) on your laptop clone the `https://github.com/argovis/demo_notebooks/` repo, change directory into it, and mount it into a containerized environment:
 
 ```
