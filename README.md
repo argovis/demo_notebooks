@@ -14,7 +14,7 @@ cd demo_notebooks
 docker container run -p 8888:8888 -v $(pwd):/books argovis/notebooks jupyter notebook --allow-root --ip=0.0.0.0
 ```
 
-After a moment, several URLs will be printed to the terminal. Copy the one beginning with http://127.0.0.1 to your browser of choice to access the notebook environment. You may want to update your image from time to time with ```docker image pull argovis/notebooks```, as we regularly update dependencies, especially [https://pypi.org/project/argovisHelpers/⁠]. Instead of updating the whole image, if you prefer you can just update the helper package, by running a notebook cell ```%pip install argovisHelpers```.
+After a moment, several URLs will be printed to the terminal. Copy the one beginning with http://127.0.0.1 to your browser of choice to access the notebook environment. You may want to update your image from time to time with ```docker image pull argovis/notebooks```, as we regularly update dependencies, especially [argovisHelpers](https://pypi.org/project/argovisHelpers/). Instead of updating the whole image, if you prefer you can just update the helper package, by running a notebook cell ```%pip install argovisHelpers```.
 
 ## Edits to the above, if you are using Windows
 Once you have cloned the demo_notebooks repository:
