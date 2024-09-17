@@ -199,6 +199,7 @@ def map_lons_lats(lons,lats,dx=20,dy=20,central_long=199,fig_sz1=8,fig_sz2=9):
     data_crs = ccrs.PlateCarree(central_longitude=central_long)
     ax = plt.axes(projection=data_crs)
     # ax = fig.add_subplot(1, 1, 1, projection=data_crs)
+    
     lon_range = np.arange(np.floor(min(lons))-dx,np.ceil(max(lons))+dx,10)
     lat_range = np.arange(np.floor(min(lats))-dy,np.ceil(max(lats))+dy,10)
     
@@ -207,16 +208,17 @@ def map_lons_lats(lons,lats,dx=20,dy=20,central_long=199,fig_sz1=8,fig_sz2=9):
     if np.floor(max(lons))<=180 and max(lon_range)>180:
         lon_range=lon_range[lon_range<=180]
     
-
     ax.set_extent([min(lon_range), max(lon_range), min(lat_range), max(lat_range)], crs=ccrs.PlateCarree())
 
     # # Put a background image on for nice sea rendering.
     ax.stock_img()
     ax.plot(lons,lats,marker='.',linestyle='none',color='k',transform=ccrs.PlateCarree())
-    ax.set_xticks(lon_range, crs=ccrs.PlateCarree(central_longitude=central_long))
+    # ax.set_xticks(lon_range, crs=ccrs.PlateCarree(central_longitude=central_long))
+    
     lon_formatter = cticker.LongitudeFormatter()
     ax.xaxis.set_major_formatter(lon_formatter)
     ax.set_yticks(lat_range, crs=ccrs.PlateCarree(central_longitude=central_long))
+    
     lat_formatter = cticker.LatitudeFormatter()
     ax.yaxis.set_major_formatter(lat_formatter)
 
