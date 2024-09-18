@@ -600,7 +600,7 @@ def api_output_formatted_list_parameter_2d_plot(api_output_formatted_list,var2us
                     if j == 'sorted': 
                         d2pl_sorted = d2pl.sortby(i[ivar]['data_xarray'][var2use_for_sorting], ascending=True)
 
-                    plt.figure()
+                    plt.figure(figsize=(10,6))
                     
                     #print(d2pl_sorted)
                     plt.pcolor(d2pl_sorted[var2use_for_sorting].values,d2pl_sorted['levels'].values,d2pl_sorted['data'].values)
