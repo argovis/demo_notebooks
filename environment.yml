@@ -12,7 +12,7 @@ dependencies:
 #  - shapely=1.8.0
   - pip:
     - svgpath2mpl==1.0.0
-    - argovisHelpers==0.0.30
+    - argovisHelpers==0.0.32
     - scipy==1.9.3
     - gsw==3.6.17
     - gsw-xarray==0.3.0
