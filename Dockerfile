@@ -9,7 +9,7 @@ RUN pip install jupyter numpy==1.22.3 requests==2.28.1 pandas==1.4.2 xarray==202
 RUN pip install --no-cache-dir --no-build-isolation gsw
 RUN pip install --no-cache-dir gsw-xarray
 RUN pip install cartopy
-RUN pip install argovisHelpers==0.0.35
+RUN pip install argovisHelpers==0.0.37
 RUN pip install netCDF4
 
 WORKDIR /books
