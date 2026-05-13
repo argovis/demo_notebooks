@@ -51,7 +51,8 @@ def traverse_query(space, time, collections, queryhelper, apikey, apiroot,
 
 
 def plot_maps(lats, lons, title="Map", margin=10, fig_settings=None,
-              labels=None, colors=None, markers=None, markersize=5):
+              labels=None, colors=None, markers=None, markersize=5,
+              edgecolors='black', linewidths=0.4):
     """
     Plot scatter locations on a map.
 
@@ -89,7 +90,7 @@ def plot_maps(lats, lons, title="Map", margin=10, fig_settings=None,
         color  = colors[i % len(colors)]
         marker = markers[i % len(markers)]
         ax.scatter(lon_group, lat_group, color=color, marker=marker, s=markersize**2.5,
-                   edgecolors='black', linewidths=0.4,
+                   edgecolors=edgecolors, linewidths=linewidths,
                    transform=ccrs.PlateCarree(), zorder=10, label=label)
         all_lons_flat.extend(lon_group)
         all_lats_flat.extend(lat_group)
