@@ -12,5 +12,9 @@ RUN pip install cartopy
 RUN pip install argovisHelpers==0.0.37
 RUN pip install netCDF4
 
+
 WORKDIR /books
+COPY pyproject.toml pyproject.toml
+COPY notebook_helpers notebook_helpers
+RUN pip install -e .
 CMD jupyter notebook --allow-root --ip=0.0.0.0

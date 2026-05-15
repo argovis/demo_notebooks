@@ -1,0 +1,7 @@
+[project]
+name = "notebook_helpers"
+version = "0.0.1"
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["notebook_helpers*"]
