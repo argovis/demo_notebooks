@@ -28,7 +28,7 @@ Deep dives into individual datasets whose schemas or query patterns differ from 
 
 ## Running the notebooks
 
-To run locally with Docker, clone the repo and mount it into the prebuilt image. First, install Git and Docker on your machine, then start the Docker application. Finally, run the following commands in the terminal:"
+To run locally with Docker, clone the repo and mount it into the prebuilt image. First, install Git (https://git-scm.com/install/) and Docker (https://docs.docker.com/desktop/) on your machine, then start the Docker application. Finally, run the following commands in the terminal:"
 
 ```
 git clone https://github.com/argovis/demo_notebooks/
