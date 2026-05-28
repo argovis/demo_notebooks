@@ -9,6 +9,7 @@ import numpy
 import numpy as np
 
 from argovisHelpers import helpers as avh
+from argovisHelpers import analysis as ava
 
 
 def traverse_query(space, time, collections, queryhelper, apikey, apiroot,
@@ -50,8 +51,99 @@ def traverse_query(space, time, collections, queryhelper, apikey, apiroot,
     return results
 
 
+def traverse_interpolate(platform_results, interpolation_levels):
+    """
+    Iterate over query results and apply interpolation to each Profile.
+
+    Parameters
+    ----------
+    platform_results : dict
+        Maps route -> list[list[list[Profile]]], matching the structure
+        returned by traverse_query (space x time x profiles).
+    interpolation_levels : list
+        Interpolation levels passed to ava.interpolate_all.
+
+    Returns
+    -------
+    dict
+        Same nested structure as platform_results, with each innermost
+        list of Profiles replaced by a list of interpolated Profiles.
+    """
+    platform_profiles = {}
+    for ds, route_results in platform_results.items():
+        platform_profiles[ds] = []
+        for region_results in route_results:
+            region_list = []
+            for time_results in region_results:
+                region_list.append(
+                    [ava.interpolate_all(p, interpolation_levels) for p in time_results]
+                )
+            platform_profiles[ds].append(region_list)
+    return platform_profiles
+
+
+# def plot_maps(lats, lons, title="Map", margin=10, fig_settings=None,
+#               labels=None, colors=None, markers=None, markersize=5,
+#               edgecolors='black', linewidths=0.4):
+#     """
+#     Plot scatter locations on a map.
+
+#     Encoding: COLOR -> dataset, MARKER -> time period.
+
+#     Parameters
+#     ----------
+#     lats, lons : list or list-of-lists
+#         Coordinates to plot. Pass a list-of-lists for multiple groups.
+#     markers : list of str, optional
+#         Marker cycle for groups. Defaults to ['o', '^', 'p', 'D', 'v', '*'].
+#     colors : list, optional
+#         Color cycle for groups. Defaults to tab10 colormap.
+#     """
+#     if fig_settings is None:
+#         fig_settings = {}
+#     if markers is None:
+#         markers = ['o', '^', 'p', 'D', 'v', '*']
+#     if colors is None:
+#         colors = list(plt.cm.tab10.colors)
+#     if len(lats) == 0:
+#         return
+#     ax = fig_settings.get('ax')
+#     show_plot = fig_settings.get('show_plot', ax is None)
+#     if ax is None:
+#         figsize = fig_settings.get('figsize', (10, 8))
+#         fig, ax = plt.subplots(figsize=figsize, subplot_kw={'projection': ccrs.PlateCarree()})
+#         ax.stock_img()
+#         ax.coastlines(resolution='50m', color='black', linewidth=0.5)
+#     lats_list = lats if isinstance(lats[0], (list, np.ndarray)) else [lats]
+#     lons_list = lons if isinstance(lons[0], (list, np.ndarray)) else [lons]
+#     all_lons_flat, all_lats_flat = [], []
+#     for i, (lat_group, lon_group) in enumerate(zip(lats_list, lons_list)):
+#         label  = labels[i] if labels and i < len(labels) else None
+#         color  = colors[i % len(colors)]
+#         marker = markers[i % len(markers)]
+#         ax.scatter(lon_group, lat_group, color=color, marker=marker, s=markersize**2.5,
+#                    edgecolors=edgecolors, linewidths=linewidths,
+#                    transform=ccrs.PlateCarree(), zorder=10, label=label)
+#         all_lons_flat.extend(lon_group)
+#         all_lats_flat.extend(lat_group)
+#     min_lon = np.nanmin(all_lons_flat) - margin
+#     max_lon = np.nanmax(all_lons_flat) + margin
+#     min_lat = max(np.nanmin(all_lats_flat) - margin, -90)
+#     max_lat = min(np.nanmax(all_lats_flat) + margin,  90)
+#     ax.set_extent([min_lon, max_lon, min_lat, max_lat], crs=ccrs.PlateCarree())
+#     gl = ax.gridlines(draw_labels=True, linewidth=0.5, color='gray', alpha=0.5, linestyle='--')
+#     gl.top_labels = True
+#     if labels:
+#         ax.legend(loc='lower left', fontsize=7, framealpha=0.7)
+#     ax.set_title(title)
+#     if show_plot:
+#         plt.show()
+#     return ax
+
 def plot_maps(lats, lons, title="Map", margin=10, fig_settings=None,
-              labels=None, colors=None, markers=None, markersize=5):
+              labels=None, colors=None, markers=None, markersize=5,
+              edgecolors='black', linewidths=0.4,
+              global_view=False, central_longitude=180):
     """
     Plot scatter locations on a map.
 
@@ -65,6 +157,13 @@ def plot_maps(lats, lons, title="Map", margin=10, fig_settings=None,
         Marker cycle for groups. Defaults to ['o', '^', 'p', 'D', 'v', '*'].
     colors : list, optional
         Color cycle for groups. Defaults to tab10 colormap.
+    global_view : bool, optional
+        If True, show the full globe (no set_extent). Pair with
+        central_longitude to choose the map centre. Default False.
+    central_longitude : float, optional
+        Central meridian for the PlateCarree projection when global_view
+        is True. 180 centres on the Pacific; 0 centres on Greenwich.
+        Ignored when global_view is False. Default 180.
     """
     if fig_settings is None:
         fig_settings = {}
@@ -74,30 +173,43 @@ def plot_maps(lats, lons, title="Map", margin=10, fig_settings=None,
         colors = list(plt.cm.tab10.colors)
     if len(lats) == 0:
         return
+
     ax = fig_settings.get('ax')
     show_plot = fig_settings.get('show_plot', ax is None)
+
     if ax is None:
         figsize = fig_settings.get('figsize', (10, 8))
-        fig, ax = plt.subplots(figsize=figsize, subplot_kw={'projection': ccrs.PlateCarree()})
+        # Use central_longitude only when global_view is requested
+        proj = (ccrs.PlateCarree(central_longitude=central_longitude)
+                if global_view else ccrs.PlateCarree())
+        fig, ax = plt.subplots(figsize=figsize, subplot_kw={'projection': proj})
         ax.stock_img()
         ax.coastlines(resolution='50m', color='black', linewidth=0.5)
+
     lats_list = lats if isinstance(lats[0], (list, np.ndarray)) else [lats]
     lons_list = lons if isinstance(lons[0], (list, np.ndarray)) else [lons]
+
     all_lons_flat, all_lats_flat = [], []
     for i, (lat_group, lon_group) in enumerate(zip(lats_list, lons_list)):
         label  = labels[i] if labels and i < len(labels) else None
         color  = colors[i % len(colors)]
         marker = markers[i % len(markers)]
         ax.scatter(lon_group, lat_group, color=color, marker=marker, s=markersize**2.5,
-                   edgecolors='black', linewidths=0.4,
+                   edgecolors=edgecolors, linewidths=linewidths,
                    transform=ccrs.PlateCarree(), zorder=10, label=label)
         all_lons_flat.extend(lon_group)
         all_lats_flat.extend(lat_group)
-    min_lon = np.nanmin(all_lons_flat) - margin
-    max_lon = np.nanmax(all_lons_flat) + margin
-    min_lat = max(np.nanmin(all_lats_flat) - margin, -90)
-    max_lat = min(np.nanmax(all_lats_flat) + margin,  90)
-    ax.set_extent([min_lon, max_lon, min_lat, max_lat], crs=ccrs.PlateCarree())
+
+    if global_view:
+        ax.set_global()                                          # ← full globe
+    else:
+        # Regional extent derived from the data + margin (original behaviour)
+        min_lon = np.nanmin(all_lons_flat) - margin
+        max_lon = np.nanmax(all_lons_flat) + margin
+        min_lat = max(np.nanmin(all_lats_flat) - margin, -90)
+        max_lat = min(np.nanmax(all_lats_flat) + margin,  90)
+        ax.set_extent([min_lon, max_lon, min_lat, max_lat], crs=ccrs.PlateCarree())
+
     gl = ax.gridlines(draw_labels=True, linewidth=0.5, color='gray', alpha=0.5, linestyle='--')
     gl.top_labels = True
     if labels:
@@ -106,7 +218,7 @@ def plot_maps(lats, lons, title="Map", margin=10, fig_settings=None,
     if show_plot:
         plt.show()
     return ax
-
+    
 def average_profiles_dict(profiles_sel, varname_lookup=None, use_nanmean=False):
     averaged = {}
     for ds, time_list in profiles_sel.items():
