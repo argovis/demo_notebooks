@@ -178,3 +178,67 @@ def compute_n2_profile(p):
     good = ~np.isnan(N2)
     return p_mid[good], N2[good]
 
+
+# ── Helper functions: spatial average and seasonal-cycle removal ────────────
+
+def spatial_average(da, lat_band, lat_dim='latitude', lon_dim=None):
+    """
+    Return the cos-latitude-weighted mean of *da* over *lat_band* = (lat_min, lat_max).
+    Only a latitude range can be specified — there is no equivalent lon_band
+    argument. If *lon_dim* is given, longitude is also fully collapsed to a
+    single averaged value (scalar output per time step); otherwise longitude
+    is left untouched at its full queried resolution and only latitude is
+    collapsed (Hovmöller output).
+
+    Requires a gridded field: *da* must be an xr.DataArray on a regular
+    lat/lon grid (e.g. as returned by tidy_grid), not a list of individual
+    profiles.
+
+    Parameters
+    ----------
+    da       : xr.DataArray  – gridded input field with a latitude coordinate
+    lat_band : tuple         – the (lat_min, lat_max) *range of values* to average over
+    lat_dim  : str           – the *name* of the latitude coordinate in da (default
+                                'latitude'), not a range — lets this work even if a
+                                dataset labels its latitude coordinate differently
+    lon_dim  : str or None   – the *name* of the longitude coordinate to also collapse,
+                                if given (same "coordinate name" role as lat_dim, not
+                                a range — there is no lon_band equivalent)
+
+    Returns
+    -------
+    xr.DataArray with the specified dimensions collapsed.
+    """
+    sub     = da.sel({lat_dim: slice(*lat_band)})
+    weights = np.cos(np.deg2rad(sub[lat_dim]))
+    weights.name = 'weights'
+    dims = [lat_dim] if lon_dim is None else [lat_dim, lon_dim]
+    return sub.weighted(weights).mean(dim=dims)
+
+
+def remove_seasonal_cycle(da, time_dim='timestamp', smooth_window=None):
+    """
+    Remove the monthly climatological seasonal cycle from *da*.
+
+    Steps
+    -----
+    1. Build the monthly climatology by averaging each calendar month.
+    2. Subtract it from the original time series (anomaly).
+    3. Optionally apply a running-mean smoother of width *smooth_window*
+       (number of time steps, centred).
+
+    Parameters
+    ----------
+    da            : xr.DataArray  – time series or time × space field
+    time_dim      : str           – name of the time dimension (default 'timestamp')
+    smooth_window : int or None   – rolling-mean window; None = no smoothing
+
+    Returns
+    -------
+    xr.DataArray – anomaly (same shape as *da*, or smoothed if requested).
+    """
+    clim  = da.groupby(f'{time_dim}.month').mean(time_dim)
+    anom  = da.groupby(f'{time_dim}.month') - clim
+    if smooth_window is not None:
+        anom = anom.rolling({time_dim: smooth_window}, center=True).mean()
+    return anom
