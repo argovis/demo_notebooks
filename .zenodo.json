@@ -1,14 +1,24 @@
 {
   "creators": [
     {
-      "name": "Bill Mills",
+      "name": "Jacopo Sala",
       "affiliation": "University of Colorado (Boulder), Dept. of Atmospheric and Ocean Science",
-      "orcid": "0000-0002-5887-6270"
+      "orcid": "0000-0002-8847-4037"
     },
     {
       "name": "Donata Giglio",
       "affiliation": "University of Colorado (Boulder), Dept. of Atmospheric and Ocean Science",
       "orcid": "0000-0002-3738-4293"
+    },
+    {
+      "name": "Katie Mills",
+      "affiliation": "University of Colorado (Boulder), Dept. of Atmospheric and Ocean Science",
+      "orcid": "0000-0002-5887-6270"
+    },
+    {
+      "name": "Megan Scanderbeg",
+      "affiliation": "Scripps Institution of Oceanography",
+      "orcid": "0000-0002-0398-7272"
     }
   ]
 }
