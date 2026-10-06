@@ -8,30 +8,13 @@ import cartopy.feature as cfeature
 from matplotlib.patches import Rectangle
 from argovisHelpers import analysis as ava
 
-from notebook_helpers.functions_candidates_for_functions import remove_seasonal_cycle
-
-
-def linear_detrend(da, time_dim='timestamp'):
-    """Remove a least-squares linear trend along `time_dim`, NaN-safe, per other dimension."""
-    t = ((da[time_dim] - da[time_dim][0]) / np.timedelta64(1, 'D')).astype(float)
-    def _dt(y, x):
-        m = np.isfinite(y)
-        if m.sum() < 2:
-            return y - np.nanmean(y)
-        b = np.polyfit(x[m], y[m], 1)
-        return y - np.polyval(b, x)
-    return xr.apply_ufunc(
-        _dt, da, t,
-        input_core_dims=[[time_dim], [time_dim]],
-        output_core_dims=[[time_dim]],
-        vectorize=True,
-    )
+from notebook_helpers.functions_candidates_for_functions import remove_seasonal_and_trend
 
 
 def compute_linear_trend(da, time_dim='timestamp', per='year'):
     """Least-squares linear trend of `da` along `time_dim`, NaN-safe, vectorized
     over every other dimension (e.g. longitude/latitude for a trend map) —
-    returns the slope only (see `linear_detrend` for the detrended residual).
+    returns the slope only (see `remove_seasonal_and_trend` for the detrended residual).
 
     Parameters
     ----------
@@ -56,11 +39,6 @@ def compute_linear_trend(da, time_dim='timestamp', per='year'):
         input_core_dims=[[time_dim], [time_dim]],
         vectorize=True,
     )
-
-
-def deseason_detrend(da, time_dim='timestamp'):
-    """Deseasonalized + linearly-detrended anomaly (climatology removed, then trend removed)."""
-    return linear_detrend(remove_seasonal_cycle(da, time_dim=time_dim), time_dim=time_dim)
 
 
 def wind_speed_to_stress(ws, rho_air=1.225, Cd=1.3e-3):
@@ -189,7 +167,7 @@ def plot_surface_timeseries(series, time_dim='timestamp', fontsize=13,
         da.plot(ax=axes[0][j], color='C0')
         axes[0][j].set_title(name, fontsize=fontsize)
         axes[0][j].set_xlabel('')
-        anom = deseason_detrend(da, time_dim=time_dim)
+        anom = remove_seasonal_and_trend(da, time_dim=time_dim, trend='linear')
         anom.plot(ax=axes[1][j], color='C3')
         axes[1][j].axhline(0, color='gray', lw=0.5)
         axes[1][j].set_title(f'{name} — anomaly', fontsize=fontsize)
@@ -251,7 +229,7 @@ def plot_depth_time_hovmoller(fields, mld_ts, time_dim='timestamp', ylim=(300, 0
         _hovmoller_panel(axes[i][0], da, time_dim=time_dim, level_name=lvl,
                          cmap=cmap, label=name, overlay_mld=mld_for, ylim=ylim)
         axes[i][0].set_title(f'{name} — total')
-        anom = deseason_detrend(da)
+        anom = remove_seasonal_and_trend(da, time_dim=time_dim, trend='linear')
         _hovmoller_panel(axes[i][1], anom, time_dim=time_dim, level_name=lvl,
                          cmap='RdBu_r', label=f'{name} anomaly',
                          overlay_mld=mld_for, ylim=ylim)

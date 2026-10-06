@@ -9,6 +9,7 @@ from argovisHelpers import analysis as ava
 import math
 import gsw
 from dateutil import parser
+from datetime import timedelta
 from scipy.interpolate import interp1d
 from math import radians, sin, cos, sqrt, atan2
 from notebook_helpers.functions import plot_maps
@@ -49,11 +50,6 @@ def haversine_km(lon1, lat1, lon2, lat2):
     dlambda = radians(lon2 - lon1)
     a = sin(dphi / 2)**2 + cos(phi1) * cos(phi2) * sin(dlambda / 2)**2
     return 2 * R * atan2(sqrt(a), sqrt(1 - a))
-
-
-def _arr(val):
-    """Safely convert Profile.getvar() output to a plain float ndarray."""
-    return val.filled(np.nan) if hasattr(val, 'filled') else np.asarray(val, dtype=float)
 
 
 def infer_dataset(p):
@@ -267,8 +263,7 @@ def compute_derived_properties(p, temperature_key=None, salinity_key=None, ds=No
     #      degenerate spline segments -> catch and return None rather than dropping the
     #      whole profile.
     REFERENCE_PRESSURE = 10
-    _pres        = _arr(pressure)
-    _finite      = _pres[np.isfinite(_pres)]
+    _finite      = pressure[np.isfinite(pressure)]
     _reaches_ref = _finite.size > 0 and np.nanmin(_finite) <= REFERENCE_PRESSURE
     if not _reaches_ref:
         _shallow = f"{np.nanmin(_finite):.1f}" if _finite.size else "n/a"
@@ -294,11 +289,8 @@ def compute_derived_properties(p, temperature_key=None, salinity_key=None, ds=No
 
     # ── N² and oscillation period — isolated so failures don't affect MLD/PD ──
     try:
-        SA_arr   = _arr(SA)
-        CT_arr   = _arr(CT)
-        pres_arr = _arr(pressure)
-        valid    = ~np.isnan(SA_arr) & ~np.isnan(CT_arr) & ~np.isnan(pres_arr)
-        SA_v, CT_v, pres_v = SA_arr[valid], CT_arr[valid], pres_arr[valid]
+        valid    = ~np.isnan(SA) & ~np.isnan(CT) & ~np.isnan(pressure)
+        SA_v, CT_v, pres_v = SA[valid], CT[valid], pressure[valid]
         order = np.argsort(pres_v)
         N2, p_mid = gsw.Nsquared(SA_v[order], CT_v[order], pres_v[order], lat=p.latitude)
         good = ~np.isnan(N2)
@@ -318,7 +310,7 @@ def compute_derived_properties(p, temperature_key=None, salinity_key=None, ds=No
 # ─────────────────────────────────────────────────────────────────────────────
 
 def deduplicate_storm_results(storm_results, track_points,
-                               max_pair_dist_km=None, radius_km=None):
+                               max_pair_dist_km=None, radius_km=None, deltaCenter=0):
     """
     Remove profiles that appear in multiple overlapping track-point windows,
     and remove spatially redundant profiles within each window.
@@ -334,6 +326,10 @@ def deduplicate_storm_results(storm_results, track_points,
     radius_km : float or None
         Hard spatial cutoff applied after assignment — profiles beyond this
         distance from their assigned track point are removed.
+    deltaCenter : float
+        Shift (in days) of the before/after split relative to the track-point
+        time. A profile is 'before' if t < track_time + deltaCenter.
+        Default 0 = split at the track-point time.
     """
     if max_pair_dist_km is None:
         max_pair_dist_km = radius_km
@@ -395,7 +391,7 @@ def deduplicate_storm_results(storm_results, track_points,
             for p in profiles:
                 try:
                     t = pd.to_datetime(p.timestamp).to_pydatetime().replace(tzinfo=None)
-                    (before_profiles if t < tc_time else after_profiles).append(p)
+                    (before_profiles if t < tc_time + timedelta(days=deltaCenter) else after_profiles).append(p)
                 except Exception:
                     before_profiles.append(p)
 
@@ -428,7 +424,8 @@ def deduplicate_storm_results(storm_results, track_points,
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_pair_dataframe(all_insitu_deduplicated, all_result_track_pts,
-                         interpolation_levels, max_pair_dist_km=None, radius_km=None):
+                         interpolation_levels, max_pair_dist_km=None, radius_km=None,
+                         deltaCenter=0):
     """
     Globally match before/after profile pairs across all track points per storm.
     Each profile appears in at most one pair.
@@ -449,6 +446,11 @@ def build_pair_dataframe(all_insitu_deduplicated, all_result_track_pts,
           - radius_km controls how far each profile can be from the track point.
           - max_pair_dist_km controls how far the two profiles can be from each other.
         Defaults to radius_km if not set.
+    deltaCenter : float
+        Shift (in days) of the before/after split relative to the track-point
+        time. A profile is 'before' if t < track_time + deltaCenter, so a
+        positive value moves the split later. Default 0 = split at the
+        track-point time.
 
     Returns
     -------
@@ -498,7 +500,7 @@ def build_pair_dataframe(all_insitu_deduplicated, all_result_track_pts,
             for p in step:
                 try:
                     t = pd.to_datetime(p.timestamp).to_pydatetime().replace(tzinfo=None)
-                    (all_before if t < tc_time else all_after).append((p, t))
+                    (all_before if t < tc_time + timedelta(days=deltaCenter) else all_after).append((p, t))
                 except Exception:
                     continue
 
@@ -622,8 +624,8 @@ def build_pair_dataframe(all_insitu_deduplicated, all_result_track_pts,
 # ─────────────────────────────────────────────────────────────────────────────
 
 def plot_storm_insitu(storm_label, track_points, all_profiles_raw,
-                      radius_km, delta_days,
-                      all_paired_storm=None,
+                      radius_km, delta_days_before, delta_days_after,
+                      deltaCenter=0, all_paired_storm=None,
                       time_linestyles=None, depth_ylim=500):
     """
     Two maps per storm in a single figure:
@@ -632,7 +634,7 @@ def plot_storm_insitu(storm_label, track_points, all_profiles_raw,
          conventions by storm class (Super Typhoon → Hurricane/Typhoon →
          Tropical Storm → Depression → Extratropical → Disturbance).
       2. Only the selected before/after pairs, colored by days relative to TC
-         passage (RdBu colormap; blue = before, red = after). Markers carry a
+         passage (RdBu colormap centered on deltaCenter; blue = before, red = after). Markers carry a
          black edge so light-shaded profiles near zero time offset remain visible.
     """
     if time_linestyles is None:
@@ -640,6 +642,7 @@ def plot_storm_insitu(storm_label, track_points, all_profiles_raw,
 
     from matplotlib.collections import LineCollection
     from matplotlib.patches import Patch
+    from matplotlib.colors import TwoSlopeNorm
 
     # ── NHC/JTWC color conventions ────────────────────────────────────────────
     CLASS_COLOR = {
@@ -811,13 +814,16 @@ def plot_storm_insitu(storm_label, track_points, all_profiles_raw,
         sc = ax2.scatter(
             pair_lons, pair_lats,
             c=pair_time_deltas, cmap='RdBu',
-            vmin=-delta_days, vmax=delta_days,
+            norm=TwoSlopeNorm(vmin=delta_days_before, vcenter=deltaCenter,
+                              vmax=delta_days_after),
             alpha=0.85, s=60,
             edgecolors='black', linewidths=0.6,
             transform=ccrs.PlateCarree(), zorder=5,
         )
         cbar = plt.colorbar(sc, ax=ax2, orientation='horizontal', pad=0.05, shrink=0.7)
         cbar.set_label('Days relative to storm passage  (− before, + after)')
+        if deltaCenter != 0:
+            cbar.ax.axvline(deltaCenter, color='k', linewidth=1.5)
         n_pairs = len(pair_lons) // 2
         ax2.set_title(
             f"{storm_label} — selected before/after pairs "
@@ -830,8 +836,8 @@ def plot_storm_insitu(storm_label, track_points, all_profiles_raw,
 
 
 def plot_one_storm(storm_id, all_insitu_deduplicated, all_result_track_pts,
-                   radius_km, delta_days,
-                   all_insitu_results=None, all_paired=None):
+                   radius_km, delta_days_before, delta_days_after,
+                   deltaCenter=0, all_insitu_results=None, all_paired=None):
     """Plot a single storm by ID."""
     if storm_id not in all_insitu_deduplicated:
         print(f"Storm ID '{storm_id}' not found. "
@@ -845,7 +851,9 @@ def plot_one_storm(storm_id, all_insitu_deduplicated, all_result_track_pts,
         all_result_track_pts[storm_id],
         raw_profiles,
         radius_km=radius_km,
-        delta_days=delta_days,
+        delta_days_before=delta_days_before,
+        delta_days_after=delta_days_after,
+        deltaCenter=deltaCenter,
         all_paired_storm=all_paired.get(storm_id) if all_paired else None,
     )
 

@@ -9,11 +9,6 @@ from argovisHelpers import helpers as avh
 from argovisHelpers import analysis as ava
 
 
-def _arr(val):
-    """Safely convert Profile.getvar() output to a plain float ndarray."""
-    return val.filled(np.nan) if hasattr(val, 'filled') else np.asarray(val, dtype=float)
-
-
 def _smooth_grid(lon_arr, depth_arr, data_2d, n_lon=200):
     """Interpolate a (lon, depth) matrix onto a finer longitude grid."""
     valid = ~np.all(np.isnan(data_2d), axis=1)
@@ -211,7 +206,7 @@ def plot_profiles_comparison(ax, profiles, depth_mask, depth_plot,
             if lon is None or lat is None:
                 continue
             try:
-                t = _arr(p.getvar('temperature'))[depth_mask]
+                t = p.getvar('temperature')[depth_mask]
             except Exception:
                 continue
             if np.all(np.isnan(t)):

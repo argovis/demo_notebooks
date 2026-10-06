@@ -9,10 +9,6 @@ from argovisHelpers import analysis as ava
 import gsw
 from notebook_helpers.functions import compare_profiles
 
-def _arr(val):
-    """Safely convert Profile.getvar() output to a plain float ndarray."""
-    return val.filled(np.nan) if hasattr(val, 'filled') else np.asarray(val, dtype=float)
-
 
 def plot_profiles_with_mld(platform_profiles, profiles_with_MLD, varname='temperature',
                            mld_key='MLD', ylim_max=400, title=None, figsize=(12, 7),
@@ -89,10 +85,10 @@ def plot_profiles_with_mld(platform_profiles, profiles_with_MLD, varname='temper
 
         color = colors[i % len(colors)]
 
-        var  = _arr(profile.getvar(varname))
-        pres = _arr(profile.getvar(pressure_key))
+        var  = profile.getvar(varname)
+        pres = profile.getvar(pressure_key)
 
-        if var.ndim == 0 or pres.ndim == 0:
+        if var is None or pres is None:
             continue
         valid = ~np.isnan(var) & ~np.isnan(pres)
         if not valid.any():
@@ -208,11 +204,8 @@ def compute_derived_properties(p, temperature_key, salinity_key, ds):
     p.setvar('MLD', p.getvar('MLD_potdensity'))
 
     # N² and oscillation period
-    SA_arr  = _arr(SA)
-    CT_arr  = _arr(CT)
-    pres_arr = _arr(pressure)
-    valid = ~np.isnan(SA_arr) & ~np.isnan(CT_arr) & ~np.isnan(pres_arr)
-    SA_v, CT_v, pres_v = SA_arr[valid], CT_arr[valid], pres_arr[valid]
+    valid = ~np.isnan(SA) & ~np.isnan(CT) & ~np.isnan(pressure)
+    SA_v, CT_v, pres_v = SA[valid], CT[valid], pressure[valid]
     order = np.argsort(pres_v)
     N2, p_mid = gsw.Nsquared(SA_v[order], CT_v[order], pres_v[order],
                               lat=p.latitude)
@@ -247,8 +240,8 @@ def compute_dT_MLD_surf(profiles_with_MLD, platform_profiles):
 
         dT = None
         if p_obj is not None:
-            temps     = _arr(p_obj.getvar('temperature'))
-            pressures = _arr(p_obj.getvar('pressure'))
+            temps     = p_obj.getvar('temperature')
+            pressures = p_obj.getvar('pressure')
             valid     = ~np.isnan(temps) & ~np.isnan(pressures)
             vt, vp    = temps[valid], pressures[valid]
 
@@ -395,9 +388,9 @@ def inspect_float_at_depths(selected_float, depth_1, depth_2, g=9.81):
     results : dict
         Dictionary with indices, pressures, T, S at the two depths.
     """
-    pressure_arr = _arr(selected_float.getvar('pressure'))
-    temp_arr = _arr(selected_float.getvar('temperature'))
-    sal_arr = _arr(selected_float.getvar('salinity'))
+    pressure_arr = selected_float.getvar('pressure')
+    temp_arr = selected_float.getvar('temperature')
+    sal_arr = selected_float.getvar('salinity')
 
     idx_1 = np.argmin(np.abs(pressure_arr - depth_1))
     idx_2 = np.argmin(np.abs(pressure_arr - depth_2))

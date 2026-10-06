@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,11 +10,6 @@ import xarray as xr
 from dateutil import parser
 from notebook_helpers.functions import plot_maps, compare_profiles
 from argovisHelpers import analysis as ava
-import gsw
-
-def _arr(val):
-    """Safely convert Profile.getvar() output to a plain float ndarray."""
-    return val.filled(np.nan) if hasattr(val, 'filled') else np.asarray(val, dtype=float)
 
 
 def _safe_interp(profiles, levels):
@@ -28,9 +24,17 @@ def _safe_interp(profiles, levels):
 
 
 def parse_profiles(nested_list):
+    """
+    Flatten `compression='minimal'` query results into a DataFrame of profile
+    locations and times (no measurements), e.g. for sampling statistics.
+
+    nested_list : list of time slices, each a list of minimal rows
+                  [id, longitude, latitude, timestamp, ...]
+
+    Returns a DataFrame with lon (0–360), lat, time, year, month.
+    """
     profiles = [p for time_slice in nested_list for p in time_slice]
-    df = pd.DataFrame(profiles)
-    df = df[['geolocation', 'timestamp', 'date']].copy() if 'date' in df.columns else df.iloc[:, [1, 2, 3]].copy()
+    df = pd.DataFrame(profiles).iloc[:, [1, 2, 3]].copy()
     df.columns = ['lon', 'lat', 'time']
     df['lon']  = df['lon'] % 360
     df['time'] = pd.to_datetime(df['time'])
@@ -38,207 +42,193 @@ def parse_profiles(nested_list):
     return df
 
 
-def build_grid(profiles, x_centers, x_half_width,
-               y_centers=None, y_half_width=None,
-               lat_min=None, lat_max=None,
-               lon_min=None, lon_max=None,
-               use_rawdata=False,
-               profile_levels=None):
+def bin_profiles(profiles, levels, centers, half_width, varname='temperature',
+                 along='longitude', lat_range=None, lon_range=None):
     """
-    Bin profiles by longitude (and optionally latitude) and compute mean temperature.
+    Average profiles in bins along longitude or latitude.
 
-    profile_levels : array-like, required when use_rawdata=True.
-        Profiles are assumed already interpolated onto these levels.
+    This is a plain bin mean, NOT a mapped/gridded product: there is no
+    weighting by distance or time, no mapping error, and no correction for
+    uneven sampling in space, season, or year. Each bin is simply the mean of
+    whichever profiles fall in it, so results reflect where and when floats
+    happened to sample. For gridded fields use a mapped product (e.g. RG09,
+    LocalGP).
+
+    Bins are [center - half_width, center + half_width) and may overlap
+    (e.g. 0.5°-wide bins every 0.25°, as in Karnauskas & Giglio 2022).
+
+    Parameters
+    ----------
+    profiles   : list of Profile – already interpolated onto `levels`
+                 (e.g. with ava.interpolate_all)
+    levels     : array-like      – the levels the profiles were interpolated onto
+    centers    : array-like      – bin centers along `along`; longitudes in 0–360
+    half_width : float           – half the bin width, in degrees
+    varname    : str             – variable to average (default 'temperature')
+    along      : str             – 'longitude' or 'latitude'
+    lat_range  : (min, max)      – optional; keep only profiles in this latitude range
+    lon_range  : (min, max)      – optional; keep only profiles in this longitude
+                                   range (0–360)
+
+    Returns
+    -------
+    xr.Dataset with `<varname>` (along × level) and `n_profiles` (along).
+    Empty bins are NaN, with n_profiles = 0.
     """
-    def get_coords(p):
-        if use_rawdata:
-            lon = p.rawdata['geolocation']['coordinates'][0]
-            lat = p.rawdata['geolocation']['coordinates'][1]
-        else:
-            lon = p['geolocation']['coordinates'][0]
-            lat = p['geolocation']['coordinates'][1]
-        return lon, lat
+    if along not in ('longitude', 'latitude'):
+        raise ValueError("along must be 'longitude' or 'latitude'")
 
-    def get_temperature(p):
-        if use_rawdata:
-            if profile_levels is not None:
-                # Already interpolated onto these levels — just extract
-                return np.array(_arr(p.getvar('temperature')), dtype=float)
-            else:
-                raise ValueError(
-                    "build_grid: profile_levels is required when use_rawdata=True. "
-                    "Pass the levels your profiles were interpolated onto."
-                )
-        else:
-            raise ValueError(
-                "build_grid: use_rawdata=False is no longer supported. "
-                "Pass use_rawdata=True with profile_levels."
-            )
+    levels = np.asarray(levels, dtype=float)
+    centers = np.asarray(centers, dtype=float)
+    lon = np.array([p.longitude % 360 for p in profiles])
+    lat = np.array([p.latitude for p in profiles])
 
-    def get_levels():
-        if use_rawdata and profile_levels is not None:
-            return profile_levels
-        else:
-            raise ValueError(
-                "build_grid: profile_levels is required when use_rawdata=True."
-            )
+    data = np.full((len(profiles), len(levels)), np.nan)
+    for i, p in enumerate(profiles):
+        v = p.getvar(varname)
+        if v is None:
+            continue
+        if len(v) != len(levels):
+            raise ValueError(f"profile {p.id}: '{varname}' has {len(v)} levels, expected "
+                             f"{len(levels)} — interpolate profiles onto `levels` first")
+        data[i] = v
 
-    def get_bin_mean(x_center, y_center=None):
-        x1, x2 = x_center - x_half_width, x_center + x_half_width
-        y1 = y_center - y_half_width if y_center is not None else None
-        y2 = y_center + y_half_width if y_center is not None else None
-        x_is_lat = lon_min is not None
-        temps = []
-        for p in profiles:
-            lon, lat = get_coords(p)
-            if lon is None or lat is None:
-                continue
-            if lat_min is not None and not (lat_min <= lat <= lat_max):
-                continue
-            if lon_min is not None and not (lon_min <= lon % 360 <= lon_max):
-                continue
-            if x_is_lat:
-                if not (x1 <= lat < x2):
-                    continue
-            else:
-                if not (x1 <= lon % 360 < x2):
-                    continue
-            if y1 is not None and not (y1 <= lat < y2):
-                continue
-            try:
-                t = get_temperature(p)
-            except Exception as e:
-                print(f"Error for profile at lon={lon:.2f}, lat={lat:.2f}: {e}")
-                continue
-            if t is None or np.all(np.isnan(t)):
-                continue
-            temps.append(np.array(t, dtype=float))
-        if not temps:
-            return None
-        mean_temp = np.nanmean(np.vstack(temps), axis=0)
-        lvls = get_levels()
-        return xr.Dataset({'temperature': xr.DataArray(mean_temp, dims='level',
-                                                        coords={'level': lvls})})
+    keep = ~np.all(np.isnan(data), axis=1)
+    if lat_range is not None:
+        keep &= (lat >= lat_range[0]) & (lat <= lat_range[1])
+    if lon_range is not None:
+        keep &= (lon >= lon_range[0]) & (lon <= lon_range[1])
+    coord = lon if along == 'longitude' else lat
 
-    def concat_grid(grid, centers, dim_name):
-        non_empty = [ds for ds in grid.values() if ds is not None]
-        if not non_empty:
-            raise ValueError("build_grid: no profiles found in any bin.")
-        template = non_empty[0]
-        nan_fill = xr.full_like(template, fill_value=np.nan)
-        return xr.concat(
-            [grid[i] if grid[i] is not None else nan_fill
-             for i in range(len(centers))],
-            dim=xr.DataArray(centers, dims=dim_name)
-        )
+    mean = np.full((len(centers), len(levels)), np.nan)
+    count = np.zeros(len(centers), dtype=int)
+    for j, c in enumerate(centers):
+        in_bin = keep & (coord >= c - half_width) & (coord < c + half_width)
+        count[j] = in_bin.sum()
+        if count[j]:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', RuntimeWarning)  # all-NaN levels
+                mean[j] = np.nanmean(data[in_bin], axis=0)
 
-    if y_centers is not None:
-        grid = {
-            (i, j): get_bin_mean(xc, yc)
-            for i, xc in enumerate(x_centers)
-            for j, yc in enumerate(y_centers)
-        }
-        non_empty = [ds for ds in grid.values() if ds is not None]
-        if not non_empty:
-            raise ValueError("build_grid: no profiles found in any bin.")
-        template = non_empty[0]
-        nan_fill = xr.full_like(template, fill_value=np.nan)
-        combined = xr.concat(
-            [
-                xr.concat(
-                    [grid.get((i, j), nan_fill) if grid.get((i, j)) is not None else nan_fill
-                     for j in range(len(y_centers))],
-                    dim=xr.DataArray(y_centers, dims='latitude')
-                )
-                for i in range(len(x_centers))
-            ],
-            dim=xr.DataArray(x_centers, dims='longitude')
-        )
+    return xr.Dataset(
+        {varname: ((along, 'level'), mean), 'n_profiles': (along, count)},
+        coords={along: centers, 'level': levels},
+        attrs={'method': f'bin mean of individual profiles, bin half-width {half_width}° '
+                         '— not a mapped product'},
+    )
+
+
+# ── Helper functions: seasonal-cycle and trend removal ──────────────────────
+
+def remove_seasonal_and_trend(da, time_dim='timestamp', seasonal='climatology',
+                              n_harmonics=2, trend=None, fit_period=None,
+                              smooth_window=None, return_components=False):
+    """
+    Remove the seasonal cycle and (optionally) a trend from a time series or a
+    time × space field, returning the anomaly.
+
+    The climatology (time mean + seasonal cycle) and the trend are fit together
+    by least squares, separately at every grid point, NaN-safe. Fitting them
+    jointly avoids the bias of doing them one after the other when the record
+    is short or starts/ends in a particular season.
+
+    Parameters
+    ----------
+    da            : xr.DataArray – series or field with a datetime `time_dim`
+    time_dim      : str          – name of the time dimension (default 'timestamp')
+    seasonal      : str or None  – 'climatology': one mean per calendar month
+                                   'harmonic'   : annual harmonics (smoother; better
+                                                  for short or gappy records)
+                                   None         : remove the time mean only
+    n_harmonics   : int          – number of harmonics if seasonal='harmonic'
+                                   (1 = annual, 2 = annual + semi-annual, ...)
+    trend         : str or None  – None, 'linear', or 'quadratic'
+    fit_period    : (start, end) – optional; estimate climatology and trend from
+                                   this period only (e.g. ('1993-01-01', '2012-12-31')),
+                                   then remove them from the whole record
+    smooth_window : int or None  – optional centred running mean of the anomaly,
+                                   in time steps
+    return_components : bool     – if True, return a Dataset with `anomaly`,
+                                   `climatology` and `trend`
+
+    Returns
+    -------
+    xr.DataArray anomaly (same shape as `da`), or an xr.Dataset of components.
+    With seasonal='climatology' and trend=None this matches subtracting the
+    monthly climatology.
+    """
+    if seasonal not in ('climatology', 'harmonic', None):
+        raise ValueError("seasonal must be 'climatology', 'harmonic' or None")
+    if trend not in (None, 'linear', 'quadratic'):
+        raise ValueError("trend must be None, 'linear' or 'quadratic'")
+
+    times = da[time_dim].to_index()
+    if fit_period is None:
+        in_fit = np.ones(len(times), dtype=bool)
     else:
-        grid     = {i: get_bin_mean(xc) for i, xc in enumerate(x_centers)}
-        combined = concat_grid(grid, x_centers, 'longitude')
+        start, end = pd.Timestamp(fit_period[0]), pd.Timestamp(fit_period[1])
+        in_fit = np.asarray((times >= start) & (times <= end))
+        if not in_fit.any():
+            raise ValueError(f'no time steps inside fit_period {fit_period}')
 
-    return grid, combined
+    # time in years, centred on the fit period (keeps the quadratic well-conditioned)
+    t_fit = times[in_fit]
+    t0 = t_fit.min() + (t_fit.max() - t_fit.min()) / 2
+    t_yr = np.asarray((times - t0) / pd.Timedelta(days=365.25), dtype=float)
 
+    # design matrix: climatology columns first, then trend columns
+    if seasonal == 'climatology':
+        clim_cols = [(times.month == m).astype(float) for m in range(1, 13)]
+    else:
+        clim_cols = [np.ones_like(t_yr)]
+        if seasonal == 'harmonic':
+            for k in range(1, n_harmonics + 1):
+                clim_cols += [np.cos(2 * np.pi * k * t_yr), np.sin(2 * np.pi * k * t_yr)]
+    degree = {None: 0, 'linear': 1, 'quadratic': 2}[trend]
+    trend_cols = [t_yr ** d for d in range(1, degree + 1)]
+    X = np.column_stack(clim_cols + trend_cols)
+    n_clim = len(clim_cols)
 
-def compute_n2_profile(p):
-    """Compute N² profile using gsw.Nsquared instead of the custom helper."""
-    SA  = _arr(p.getvar('absolute_salinity'))
-    CT  = _arr(p.getvar('conservative_temperature'))
-    pres = _arr(p.getvar('pressure'))
+    def _components(coef, used):
+        # coef: (n_columns, n_series); rows of unused columns are ignored
+        clim = X[:, :n_clim] @ np.where(used[:n_clim, None], coef[:n_clim], 0)
+        clim[X[:, :n_clim][:, ~used[:n_clim]].any(axis=1)] = np.nan  # unsampled months
+        return clim, X[:, n_clim:] @ coef[n_clim:]
 
-    valid = ~np.isnan(SA) & ~np.isnan(CT) & ~np.isnan(pres)
-    SA_v, CT_v, pres_v = SA[valid], CT[valid], pres[valid]
+    # one row per grid point, time last
+    da_t = da.astype(float).transpose(..., time_dim)
+    y = da_t.values.reshape(-1, len(times))
+    clim = np.full(y.shape, np.nan)
+    trnd = np.full(y.shape, np.nan)
 
-    order = np.argsort(pres_v)
-    SA_v, CT_v, pres_v = SA_v[order], CT_v[order], pres_v[order]
+    finite = np.isfinite(y[:, in_fit])
+    complete = finite.all(axis=1)
+    if complete.any():
+        # all grid points without gaps share the same fit: solve them in one call
+        used = X[in_fit].any(axis=0)
+        if in_fit.sum() > used.sum():
+            coef = np.zeros((X.shape[1], complete.sum()))
+            coef[used] = np.linalg.lstsq(X[in_fit][:, used], y[complete][:, in_fit].T, rcond=None)[0]
+            c, t = _components(coef, used)
+            clim[complete], trnd[complete] = c.T, t.T
+    for i in np.flatnonzero(~complete & finite.any(axis=1)):
+        # grid points with gaps: fit each one on its own valid samples
+        ok = in_fit & np.isfinite(y[i])
+        used = X[ok].any(axis=0)
+        if ok.sum() <= used.sum():
+            continue                                  # not enough points to fit
+        coef = np.zeros((X.shape[1], 1))
+        coef[used, 0] = np.linalg.lstsq(X[ok][:, used], y[i, ok], rcond=None)[0]
+        c, t = _components(coef, used)
+        clim[i], trnd[i] = c[:, 0], t[:, 0]
 
-    N2, p_mid = gsw.Nsquared(SA_v, CT_v, pres_v, lat=p.latitude)
+    clim = da_t.copy(data=clim.reshape(da_t.shape)).transpose(*da.dims)
+    trnd = da_t.copy(data=trnd.reshape(da_t.shape)).transpose(*da.dims)
 
-    good = ~np.isnan(N2)
-    return p_mid[good], N2[good]
-
-
-# ── Helper functions: spatial average and seasonal-cycle removal ────────────
-
-def spatial_average(da, lat_band, lat_dim='latitude', lon_dim=None):
-    """
-    Return the cos-latitude-weighted mean of *da* over *lat_band* = (lat_min, lat_max).
-    Only a latitude range can be specified — there is no equivalent lon_band
-    argument. If *lon_dim* is given, longitude is also fully collapsed to a
-    single averaged value (scalar output per time step); otherwise longitude
-    is left untouched at its full queried resolution and only latitude is
-    collapsed (Hovmöller output).
-
-    Requires a gridded field: *da* must be an xr.DataArray on a regular
-    lat/lon grid (e.g. as returned by tidy_grid), not a list of individual
-    profiles.
-
-    Parameters
-    ----------
-    da       : xr.DataArray  – gridded input field with a latitude coordinate
-    lat_band : tuple         – the (lat_min, lat_max) *range of values* to average over
-    lat_dim  : str           – the *name* of the latitude coordinate in da (default
-                                'latitude'), not a range — lets this work even if a
-                                dataset labels its latitude coordinate differently
-    lon_dim  : str or None   – the *name* of the longitude coordinate to also collapse,
-                                if given (same "coordinate name" role as lat_dim, not
-                                a range — there is no lon_band equivalent)
-
-    Returns
-    -------
-    xr.DataArray with the specified dimensions collapsed.
-    """
-    sub     = da.sel({lat_dim: slice(*lat_band)})
-    weights = np.cos(np.deg2rad(sub[lat_dim]))
-    weights.name = 'weights'
-    dims = [lat_dim] if lon_dim is None else [lat_dim, lon_dim]
-    return sub.weighted(weights).mean(dim=dims)
-
-
-def remove_seasonal_cycle(da, time_dim='timestamp', smooth_window=None):
-    """
-    Remove the monthly climatological seasonal cycle from *da*.
-
-    Steps
-    -----
-    1. Build the monthly climatology by averaging each calendar month.
-    2. Subtract it from the original time series (anomaly).
-    3. Optionally apply a running-mean smoother of width *smooth_window*
-       (number of time steps, centred).
-
-    Parameters
-    ----------
-    da            : xr.DataArray  – time series or time × space field
-    time_dim      : str           – name of the time dimension (default 'timestamp')
-    smooth_window : int or None   – rolling-mean window; None = no smoothing
-
-    Returns
-    -------
-    xr.DataArray – anomaly (same shape as *da*, or smoothed if requested).
-    """
-    clim  = da.groupby(f'{time_dim}.month').mean(time_dim)
-    anom  = da.groupby(f'{time_dim}.month') - clim
+    anomaly = da - clim - trnd
     if smooth_window is not None:
-        anom = anom.rolling({time_dim: smooth_window}, center=True).mean()
-    return anom
+        anomaly = anomaly.rolling({time_dim: smooth_window}, center=True).mean()
+
+    if return_components:
+        return xr.Dataset({'anomaly': anomaly, 'climatology': clim, 'trend': trnd})
+    return anomaly
