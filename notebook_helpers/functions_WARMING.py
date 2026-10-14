@@ -6,7 +6,8 @@ import cartopy.feature as cfeature
 
 def plot_gcos_ohc_layers(ds, layers, labels=None, colors=None,
                          title='GCOS Earth Heat Inventory — global ocean heat content by layer',
-                         ylabel='Ocean heat content anomaly (ZJ)'):
+                         ylabel='Ocean heat content anomaly (ZJ)',
+                         show_trend=False, earth_area=5.1e14):
     """Plot one or more depth-layer OHC time series from the GCOS Earth Heat Inventory,
     with shaded uncertainty bands where a matching '<var>_uncertainty' variable exists.
 
@@ -16,6 +17,11 @@ def plot_gcos_ohc_layers(ds, layers, labels=None, colors=None,
     layers : list of str  data variable names, e.g. 'ocean_heat_content_0-300m'
     labels : list of str, optional  legend labels (defaults to `layers`)
     colors : list, optional  color cycle (defaults to tab10)
+    show_trend : bool  if True (and exactly one layer is given), fit and overlay
+                 a linear trend line, with its slope converted to an equivalent
+                 heat flux (W/m², dividing by `earth_area`) shown in the legend —
+                 this is the "OHC trend as an EEI estimate" conversion.
+    earth_area : float  Earth's total surface area in m² (used for the W/m² conversion)
     """
     if labels is None:
         labels = layers
@@ -31,6 +37,15 @@ def plot_gcos_ohc_layers(ds, layers, labels=None, colors=None,
         if unc_name in ds:
             unc = ds[unc_name]
             ax.fill_between(da.time, da - unc, da + unc, color=color, alpha=0.15)
+
+        if show_trend and len(layers) == 1:
+            t_years = (da.time.values - da.time.values[0]) / np.timedelta64(1, 'D') / 365.25
+            slope_zj_per_yr, intercept = np.polyfit(t_years, da.values, 1)
+            trend_line = intercept + slope_zj_per_yr * t_years
+            slope_w_per_m2 = slope_zj_per_yr * 1e21 / (365.25 * 86400) / earth_area
+            ax.plot(da.time, trend_line, color='black', linestyle='--', linewidth=1.5,
+                   label=f'Trend: {slope_w_per_m2:.2f} W/m²')
+
     ax.axhline(0, color='gray', linewidth=0.5)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
@@ -121,22 +136,67 @@ def plot_weekly_vs_annual_sst(weekly_series, annual_series,
 
 
 def plot_ohc_trend_map(trend, title='OHC trend', cbar_label='OHC trend (J/m²/yr)',
-                       cmap='RdBu_r'):
+                       cmap='RdBu_r', region_box=None, global_view=False, vmax=None,
+                       n_levels=None, robust=False):
     """Single-panel map of a linear-trend field (e.g. from compute_linear_trend),
     on a diverging colormap centered at zero so warming/cooling read symmetrically.
 
     Parameters
     ----------
     trend : xr.DataArray (longitude x latitude)
+    region_box : [[lon_min, lat_min], [lon_max, lat_max]], optional
+        If given, outline this box on the map — e.g. to show where a smaller
+        regional analysis sits within a global field.
+    global_view : bool
+        If True, force the full globe into view (`ax.set_global()`) rather than
+        the default extent implied by `trend`'s own lon/lat range.
+    vmax : float, optional
+        Force the colorbar to +/- this value, e.g. so two maps being compared
+        side by side (ours vs. AR6) share the same color scale. Defaults to
+        the max absolute value in `trend` itself.
+    n_levels : int, optional
+        If given, use this many discrete color bins instead of a continuous
+        colormap. An even number puts a bin edge at zero, so every positive
+        value is red-ish and every negative value blue-ish (no "white" bin
+        that hides small trends).
+    robust : bool
+        If True (and `vmax` is not given), set the color limit to the 98th
+        percentile of |trend| rather than the maximum, so a few extreme grid
+        cells don't wash out the pattern everywhere else. Values beyond the
+        limit take the end colors (arrows on the colorbar).
     """
-    vmax = float(np.nanmax(np.abs(trend.values)))
+    from matplotlib.patches import Rectangle
+    from matplotlib.colors import BoundaryNorm
+
+    absmax = float(np.nanmax(np.abs(trend.values)))
+    if vmax is None:
+        vmax = float(np.nanpercentile(np.abs(trend.values), 98)) if robust else absmax
+    if n_levels is not None:
+        # snap the bin width to the nearest "nice" number (1, 2, 2.5, 5 x 10^k) so colorbar ticks are round
+        step = vmax / (n_levels / 2)
+        base = 10 ** np.floor(np.log10(step))
+        step = min((m * base for m in (1, 2, 2.5, 5, 10)), key=lambda c: abs(np.log(c / step)))
+        vmax = step * (n_levels / 2)
+    extend = 'both' if vmax < absmax else 'neither'
+    if n_levels is None:
+        cmap_obj, norm = plt.get_cmap(cmap), plt.Normalize(-vmax, vmax)
+    else:
+        cmap_obj = plt.get_cmap(cmap, n_levels)
+        norm = BoundaryNorm(np.linspace(-vmax, vmax, n_levels + 1), n_levels)
     fig, ax = plt.subplots(figsize=(9, 7), subplot_kw={'projection': ccrs.PlateCarree()})
     snap = trend.transpose('latitude', 'longitude')
     pc = ax.pcolormesh(snap.longitude, snap.latitude, snap,
-                       cmap=cmap, vmin=-vmax, vmax=vmax,
+                       cmap=cmap_obj, norm=norm,
                        transform=ccrs.PlateCarree(), shading='auto')
     ax.add_feature(cfeature.LAND, facecolor='lightgray', zorder=2)
     ax.coastlines(zorder=3)
+    if global_view:
+        ax.set_global()
+    if region_box is not None:
+        (lon0, lat0), (lon1, lat1) = region_box
+        ax.add_patch(Rectangle((lon0, lat0), lon1 - lon0, lat1 - lat0,
+                               fill=False, edgecolor='black', linewidth=2,
+                               transform=ccrs.PlateCarree(), zorder=4))
     gl = ax.gridlines(draw_labels=True, alpha=0.3)
     gl.top_labels = gl.right_labels = False
     ax.set_title(title)
@@ -150,5 +210,5 @@ def plot_ohc_trend_map(trend, title='OHC trend', cbar_label='OHC trend (J/m²/yr
     fig.canvas.draw()
     pos = ax.get_position()
     cax = fig.add_axes([pos.x1 + 0.02, pos.y0, 0.02, pos.height])
-    fig.colorbar(pc, cax=cax, label=cbar_label)
+    fig.colorbar(pc, cax=cax, label=cbar_label, extend=extend)
     plt.show()
