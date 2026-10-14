@@ -310,7 +310,8 @@ def compute_derived_properties(p, temperature_key=None, salinity_key=None, ds=No
 # ─────────────────────────────────────────────────────────────────────────────
 
 def deduplicate_storm_results(storm_results, track_points,
-                               max_pair_dist_km=None, radius_km=None, deltaCenter=0):
+                               max_pair_dist_km=None, radius_km=None, deltaCenter=0,
+                               assign_nearest=True):
     """
     Remove profiles that appear in multiple overlapping track-point windows,
     and remove spatially redundant profiles within each window.
@@ -330,6 +331,13 @@ def deduplicate_storm_results(storm_results, track_points,
         Shift (in days) of the before/after split relative to the track-point
         time. A profile is 'before' if t < track_time + deltaCenter.
         Default 0 = split at the track-point time.
+    assign_nearest : bool
+        True (default): each profile is assigned to its single nearest track
+        point, then spatially redundant profiles are thinned.
+        False: every profile stays a candidate for every track point whose
+        radius contains it (no nearest-point assignment, no thinning); use
+        together with build_pair_dataframe(pairing='max_pairs'), which then
+        decides the assignment.
     """
     if max_pair_dist_km is None:
         max_pair_dist_km = radius_km
@@ -359,9 +367,14 @@ def deduplicate_storm_results(storm_results, track_points,
     for step_idx, step_data in enumerate(storm_results):
         if not step_data:
             continue
+        seen_ids = set()
         for p in get_flat_profiles(step_data):
             try:
-                if best.get(p.id, (None, None, -1))[2] == step_idx:
+                if not assign_nearest:
+                    if p.id not in seen_ids:
+                        seen_ids.add(p.id)
+                        deduplicated[step_idx].append(p)
+                elif best.get(p.id, (None, None, -1))[2] == step_idx:
                     deduplicated[step_idx].append(p)
             except Exception:
                 continue
@@ -380,7 +393,7 @@ def deduplicate_storm_results(storm_results, track_points,
     # ── Pass 3: spatial deduplication within each step ───────────────────────
     # Runs separately on before and after groups so that a before/after pair
     # that happens to be spatially close is never removed.
-    if max_pair_dist_km is not None:
+    if max_pair_dist_km is not None and assign_nearest:
         for step_idx, profiles in enumerate(deduplicated):
             if not profiles:
                 continue
@@ -423,9 +436,73 @@ def deduplicate_storm_results(storm_results, track_points,
 # Pairing and delta computation
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _select_pairs_max(steps, track_pts, radius_km, max_pair_dist_km, deltaCenter):
+    """
+    Choose (track point, before, after) triples so that the NUMBER OF PAIRS is
+    maximal (each track point, before profile and after profile used at most
+    once); among all maximal selections, the one with the smallest total
+    distance of the two profiles to their track point wins.
+
+    Solved exactly as a small integer program (scipy.optimize.milp). Before/after
+    is decided per track point: t < track_time + deltaCenter days.
+    Returns tuples (pair_dist_km, dt_s, step_idx, p_b, t_b, p_a, t_a).
+    """
+    from scipy.optimize import milp, LinearConstraint, Bounds
+    from scipy.sparse import coo_matrix
+
+    cands = []
+    for step_idx, (step, pt) in enumerate(zip(steps, track_pts)):
+        if not step:
+            continue
+        tc_lon, tc_lat = pt['center']
+        split = parser.parse(pt['time']).replace(tzinfo=None) + timedelta(days=deltaCenter)
+        bef, aft = [], []
+        for p in step:
+            d = haversine_km(tc_lon, tc_lat, p.longitude, p.latitude)
+            if d > radius_km:
+                continue
+            try:
+                t = pd.to_datetime(p.timestamp).to_pydatetime().replace(tzinfo=None)
+            except Exception:
+                continue
+            (bef if t < split else aft).append((p, t, d))
+        for p_b, t_b, d_b in bef:
+            for p_a, t_a, d_a in aft:
+                dist = haversine_km(p_b.longitude, p_b.latitude,
+                                    p_a.longitude, p_a.latitude)
+                if max_pair_dist_km is not None and dist > max_pair_dist_km:
+                    continue
+                cost = (d_b + d_a) / (2.0 * radius_km)          # in [0, 1]
+                cands.append((step_idx, p_b, t_b, p_a, t_a, dist,
+                              abs((t_a - t_b).total_seconds()), cost))
+    if not cands:
+        return []
+
+    # constraint rows: track points | before profiles | after profiles
+    b_idx = {p_b.id: k for k, p_b in enumerate({cd[1].id: cd[1] for cd in cands}.values())}
+    a_idx = {p_a.id: k for k, p_a in enumerate({cd[3].id: cd[3] for cd in cands}.values())}
+    n_s, n_b = len(steps), len(b_idx)
+    n_rows = n_s + n_b + len(a_idx)
+    rows, cols = [], []
+    for j, cd in enumerate(cands):
+        rows += [cd[0], n_s + b_idx[cd[1].id], n_s + n_b + a_idx[cd[3].id]]
+        cols += [j, j, j]
+    A = coo_matrix(([1.0] * len(rows), (rows, cols)), shape=(n_rows, len(cands)))
+
+    # one extra pair always outweighs any total-distance difference
+    eps = 1.0 / (len(steps) + 1)
+    c = np.array([-(1.0 - eps * cd[7]) for cd in cands])
+    res = milp(c, constraints=LinearConstraint(A, ub=np.ones(n_rows)),
+               integrality=np.ones(len(cands)), bounds=Bounds(0, 1))
+    if res.x is None:
+        return []
+    return [(cd[5], cd[6], cd[0], cd[1], cd[2], cd[3], cd[4])
+            for cd, x in zip(cands, res.x) if x > 0.5]
+
+
 def build_pair_dataframe(all_insitu_deduplicated, all_result_track_pts,
                          interpolation_levels, max_pair_dist_km=None, radius_km=None,
-                         deltaCenter=0):
+                         deltaCenter=0, pairing='greedy'):
     """
     Globally match before/after profile pairs across all track points per storm.
     Each profile appears in at most one pair.
@@ -451,6 +528,12 @@ def build_pair_dataframe(all_insitu_deduplicated, all_result_track_pts,
         time. A profile is 'before' if t < track_time + deltaCenter, so a
         positive value moves the split later. Default 0 = split at the
         track-point time.
+    pairing : {'greedy', 'max_pairs'}
+        'greedy' (default): pairs ranked by the distance between the two
+        profiles, assigned greedily.
+        'max_pairs': maximize the number of pairs first, then minimize the
+        profiles' total distance to their track point. Use together with
+        deduplicate_storm_results(..., assign_nearest=False).
 
     Returns
     -------
@@ -510,47 +593,51 @@ def build_pair_dataframe(all_insitu_deduplicated, all_result_track_pts,
 
         print(f"  {storm_id}: {len(all_before)} before, {len(all_after)} after profiles")
 
-        # ── Generate all valid (track_point, before, after) candidates ────────
-        candidates = []
-        for step_idx, (step, pt) in enumerate(zip(steps, track_pts)):
-            if not step:
-                continue
-            tc_lon, tc_lat = pt['center']
+        if pairing == 'max_pairs':
+            assigned = _select_pairs_max(steps, track_pts, radius_km,
+                                         max_pair_dist_km, deltaCenter)
+        else:
+            # ── Generate all valid (track_point, before, after) candidates ────────
+            candidates = []
+            for step_idx, (step, pt) in enumerate(zip(steps, track_pts)):
+                if not step:
+                    continue
+                tc_lon, tc_lat = pt['center']
 
-            before_near = [
-                (p, t) for p, t in all_before
-                if haversine_km(tc_lon, tc_lat, p.longitude, p.latitude) <= radius_km
-            ]
-            after_near = [
-                (p, t) for p, t in all_after
-                if haversine_km(tc_lon, tc_lat, p.longitude, p.latitude) <= radius_km
-            ]
+                before_near = [
+                    (p, t) for p, t in all_before
+                    if haversine_km(tc_lon, tc_lat, p.longitude, p.latitude) <= radius_km
+                ]
+                after_near = [
+                    (p, t) for p, t in all_after
+                    if haversine_km(tc_lon, tc_lat, p.longitude, p.latitude) <= radius_km
+                ]
 
-            for p_b, t_b in before_near:
-                for p_a, t_a in after_near:
-                    dist = haversine_km(p_b.longitude, p_b.latitude,
-                                        p_a.longitude, p_a.latitude)
-                    if max_pair_dist_km is not None and dist > max_pair_dist_km:
-                        continue
-                    dt = abs((t_a - t_b).total_seconds())
-                    candidates.append((dist, dt, step_idx, p_b, t_b, p_a, t_a))
+                for p_b, t_b in before_near:
+                    for p_a, t_a in after_near:
+                        dist = haversine_km(p_b.longitude, p_b.latitude,
+                                            p_a.longitude, p_a.latitude)
+                        if max_pair_dist_km is not None and dist > max_pair_dist_km:
+                            continue
+                        dt = abs((t_a - t_b).total_seconds())
+                        candidates.append((dist, dt, step_idx, p_b, t_b, p_a, t_a))
 
-        # ── Greedy assignment: best score first, each entity used once ────────
-        candidates.sort(key=lambda x: (x[0], x[1]))  # sort by (dist, dt)
+            # ── Greedy assignment: best score first, each entity used once ────────
+            candidates.sort(key=lambda x: (x[0], x[1]))  # sort by (dist, dt)
 
-        used_steps  = set()
-        used_before = set()
-        used_after  = set()
-        assigned    = []
+            used_steps  = set()
+            used_before = set()
+            used_after  = set()
+            assigned    = []
 
-        for dist, dt, step_idx, p_b, t_b, p_a, t_a in candidates:
-            if step_idx in used_steps:  continue
-            if p_b.id   in used_before: continue
-            if p_a.id   in used_after:  continue
-            used_steps.add(step_idx)
-            used_before.add(p_b.id)
-            used_after.add(p_a.id)
-            assigned.append((dist, dt, step_idx, p_b, t_b, p_a, t_a))
+            for dist, dt, step_idx, p_b, t_b, p_a, t_a in candidates:
+                if step_idx in used_steps:  continue
+                if p_b.id   in used_before: continue
+                if p_a.id   in used_after:  continue
+                used_steps.add(step_idx)
+                used_before.add(p_b.id)
+                used_after.add(p_a.id)
+                assigned.append((dist, dt, step_idx, p_b, t_b, p_a, t_a))
 
         print(f"  {storm_id}: {len(assigned)} pairs assigned")
 
