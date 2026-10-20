@@ -8,13 +8,11 @@ import cartopy.feature as cfeature
 from matplotlib.patches import Rectangle
 from argovisHelpers import analysis as ava
 
-from notebook_helpers.functions_candidates_for_functions import remove_seasonal_and_trend
-
 
 def compute_linear_trend(da, time_dim='timestamp', per='year'):
     """Least-squares linear trend of `da` along `time_dim`, NaN-safe, vectorized
     over every other dimension (e.g. longitude/latitude for a trend map) —
-    returns the slope only (see `remove_seasonal_and_trend` for the detrended residual).
+    returns the slope only (see `ava.remove_seasonal_and_trend` for the detrended residual).
 
     Parameters
     ----------
@@ -167,7 +165,7 @@ def plot_surface_timeseries(series, time_dim='timestamp', fontsize=13,
         da.plot(ax=axes[0][j], color='C0')
         axes[0][j].set_title(name, fontsize=fontsize)
         axes[0][j].set_xlabel('')
-        anom = remove_seasonal_and_trend(da, time_dim=time_dim, trend='linear')
+        anom = ava.remove_seasonal_and_trend(da, time_dim=time_dim, trend='linear')
         anom.plot(ax=axes[1][j], color='C3')
         axes[1][j].axhline(0, color='gray', lw=0.5)
         axes[1][j].set_title(f'{name} — anomaly', fontsize=fontsize)
@@ -229,7 +227,7 @@ def plot_depth_time_hovmoller(fields, mld_ts, time_dim='timestamp', ylim=(300, 0
         _hovmoller_panel(axes[i][0], da, time_dim=time_dim, level_name=lvl,
                          cmap=cmap, label=name, overlay_mld=mld_for, ylim=ylim)
         axes[i][0].set_title(f'{name} — total')
-        anom = remove_seasonal_and_trend(da, time_dim=time_dim, trend='linear')
+        anom = ava.remove_seasonal_and_trend(da, time_dim=time_dim, trend='linear')
         _hovmoller_panel(axes[i][1], anom, time_dim=time_dim, level_name=lvl,
                          cmap='RdBu_r', label=f'{name} anomaly',
                          overlay_mld=mld_for, ylim=ylim)

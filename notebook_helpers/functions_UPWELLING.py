@@ -24,6 +24,25 @@ def _smooth_grid(lon_arr, depth_arr, data_2d, n_lon=200):
     return lon_fine, interp((lg, dg))
 
 
+def parse_profiles(nested_list):
+    """
+    Flatten `compression='minimal'` query results into a DataFrame of profile
+    locations and times (no measurements), e.g. for sampling statistics.
+
+    nested_list : list of time slices, each a list of minimal rows
+                  [id, longitude, latitude, timestamp, ...]
+
+    Returns a DataFrame with lon (0–360), lat, time, year, month.
+    """
+    profiles = [p for time_slice in nested_list for p in time_slice]
+    df = pd.DataFrame(profiles).iloc[:, [1, 2, 3]].copy()
+    df.columns = ['lon', 'lat', 'time']
+    df['lon']  = df['lon'] % 360
+    df['time'] = pd.to_datetime(df['time'])
+    df['year'], df['month'] = df['time'].dt.year, df['time'].dt.month
+    return df
+
+
 def plot_section(ax, combined, depth_mask, island_lon,
                  inset_lon_min, inset_lon_max, inset_depth_min, inset_depth_max,
                  label='', levels=np.arange(8, 30, 2), iso_levels=[15, 25],
