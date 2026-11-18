@@ -1,0 +1,11 @@
+[project]
+name = "cartopy_userconfig"
+version = "0.0.1"
+description = "Map data for cartopy in the browser, where cartopy cannot download it."
+dependencies = []
+
+[tool.setuptools]
+packages = ["cartopy_userconfig"]
+
+[tool.setuptools.package-data]
+cartopy_userconfig = ["data/**/*"]

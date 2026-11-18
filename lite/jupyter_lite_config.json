@@ -1,0 +1,15 @@
+{
+  "PyodideLockAddon": {
+    "enabled": true,
+    "specs": [
+      "argovisHelpers==0.0.41",
+      "gsw @ https://files.pythonhosted.org/packages/e7/ac/57f9df6b2fc6ffc4ba101fe31f0247b7100e0fe1b52edbd3e5d384c726a1/gsw-3.6.23-cp311-abi3-pyemscripten_2026_0_wasm32.whl"
+    ],
+    "wheels": [
+      "dist"
+    ],
+    "prefetch_extra": [
+      "cartopy_userconfig"
+    ]
+  }
+}

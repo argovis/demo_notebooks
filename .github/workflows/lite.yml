@@ -1,0 +1,45 @@
+# Builds the JupyterLite site with the container in lite/ and publishes it to
+# GitHub Pages. Requires Settings > Pages > Source set to "GitHub Actions".
+name: JupyterLite site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the build-environment image
+        run: docker build -t argovis/lite-builder lite/
+
+      - name: Build the site
+        run: |
+          mkdir -p _output
+          docker run --rm -v "$PWD":/repo:ro -v "$PWD/_output":/out argovis/lite-builder
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _output
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
