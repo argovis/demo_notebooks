@@ -1,5 +1,5 @@
 import os
-import urllib.request
+import requests
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
@@ -21,7 +21,11 @@ def _ensure_ar6_file(path):
         raise FileNotFoundError(f"{path} not found, and no download URL is known for '{name}'.")
     os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
     try:
-        urllib.request.urlretrieve(AR6_URLS[name], path)
+        # requests (not urllib) so this also works in the browser (JupyterLite).
+        response = requests.get(AR6_URLS[name])
+        response.raise_for_status()
+        with open(path, 'wb') as f:
+            f.write(response.content)
     except Exception as e:
         if os.path.exists(path):
             os.remove(path)

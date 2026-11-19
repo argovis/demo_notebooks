@@ -18,6 +18,7 @@ activities/Mediterranean_Sea_Outflow.ipynb
 activities/Meridional_Overturning_Circulation.ipynb
 activities/Ocean_Stratification_Advanced.ipynb
 activities/Oxygen_Vertical_Structure.ipynb
+activities/Earths_Energy_Imbalance_and_Ocean_Heat_Content.ipynb
 activities/Equatorial_Upwelling.ipynb
 activities/Marine_Heatwaves.ipynb
 activities/Ocean_Stratification_Intro.ipynb
@@ -26,6 +27,12 @@ activities/Tropical_Cyclones_and_Ocean_Changes.ipynb
 dataset_specific_notebooks/Argo_float_location_forecasts.ipynb
 dataset_specific_notebooks/Argo_trajectories.ipynb
 dataset_specific_notebooks/Intro_to_Atmospheric_Rivers.ipynb
+"
+
+# Data files to publish beside the notebooks that read them, as paths
+# relative to the repository root. These must exist in the repository.
+DATA_FILES="
+activities/GCOS_EHI_1960-2020_Earth_Heat_Inventory_Ocean_Heat_Content_data.nc
 "
 
 cd /work
@@ -76,6 +83,25 @@ for notebook in $NOTEBOOKS; do
     cp "/repo/$notebook" "content/$notebook"
     jupyter nbconvert --clear-output --inplace "content/$notebook"
 done
+for data_file in $DATA_FILES; do
+    if [ ! -f "/repo/$data_file" ]; then
+        echo "Data file listed in lite/build_site.sh is missing from the repository: $data_file"
+        exit 1
+    fi
+    mkdir -p "content/$(dirname "$data_file")"
+    cp "/repo/$data_file" "content/$data_file"
+done
+
+#    The Earth's Energy Imbalance notebook also reads two IPCC AR6 figure
+#    files. Outside the browser its helper downloads them from GitHub on first
+#    use; that download is not possible in the browser, so they are fetched
+#    here and published in the folder where the notebook looks for them.
+#    Source and citation: https://doi.org/10.5281/zenodo.5217365
+AR6_SOURCE=https://raw.githubusercontent.com/IPCC-WG1/Chapter-9/main/Plotting_code_and_data
+AR6_FOLDER=content/activities/AR6_Fig9_data
+mkdir -p "$AR6_FOLDER"
+python -c "import urllib.request; urllib.request.urlretrieve('$AR6_SOURCE/Fig9_03_SST/Plotted_Data/Fig9-3c_data.nc', '$AR6_FOLDER/Fig9-3c_data.nc')"
+python -c "import urllib.request; urllib.request.urlretrieve('$AR6_SOURCE/Fig9_06_OHC/Plotted_Data/Fig9-6b_data.nc', '$AR6_FOLDER/Fig9-6b_data.nc')"
 
 # 4. Build the static site. The packages named in jupyter_lite_config.json
 #    are resolved here and recorded in the site's pyodide-lock.json.
