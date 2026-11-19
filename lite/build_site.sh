@@ -17,6 +17,13 @@ activities/Mediterranean_Sea_Outflow.ipynb
 activities/Meridional_Overturning_Circulation.ipynb
 activities/Ocean_Stratification_Advanced.ipynb
 activities/Oxygen_Vertical_Structure.ipynb
+activities/Equatorial_Upwelling.ipynb
+activities/Marine_Heatwaves.ipynb
+activities/Ocean_Stratification_Intro.ipynb
+activities/Subsurface_Ocean_Features_and_Water_Masses.ipynb
+activities/Tropical_Cyclones_and_Ocean_Changes.ipynb
+dataset_specific_notebooks/Argo_float_location_forecasts.ipynb
+dataset_specific_notebooks/Intro_to_Atmospheric_Rivers.ipynb
 "
 
 cd /work
@@ -33,13 +40,31 @@ python -m build --wheel --outdir dist helpers_src
 # 2. Package the map data cartopy needs as a second wheel. cartopy cannot
 #    download it in the browser, so it is downloaded here instead, from the
 #    same address cartopy itself uses. See lite/cartopy_userconfig.
-#    To add another Natural Earth dataset, repeat the download and unpack
-#    lines with its address.
+#
+#    cartopy chooses a resolution from the size of the map being drawn
+#    (110m for large areas, 50m under 50 degrees wide, 10m under 15 degrees),
+#    so every dataset is bundled at all three resolutions.
+#    To add another Natural Earth dataset, add a "category/name" line.
+MAP_DATASETS="
+physical/coastline
+physical/land
+cultural/admin_0_boundary_lines_land
+"
+MAP_RESOLUTIONS="110m 50m 10m"
+
 cp -r /repo/lite/cartopy_userconfig userconfig_src
-MAP_DATA_DIR=userconfig_src/cartopy_userconfig/data/shapefiles/natural_earth/physical
-mkdir -p "$MAP_DATA_DIR"
-python -c "import urllib.request; urllib.request.urlretrieve('https://naturalearth.s3.amazonaws.com/50m_physical/ne_50m_coastline.zip', 'ne_50m_coastline.zip')"
-python -m zipfile -e ne_50m_coastline.zip "$MAP_DATA_DIR"
+MAP_DATA_ROOT=userconfig_src/cartopy_userconfig/data/shapefiles/natural_earth
+for dataset in $MAP_DATASETS; do
+    category=$(dirname "$dataset")
+    name=$(basename "$dataset")
+    mkdir -p "$MAP_DATA_ROOT/$category"
+    for resolution in $MAP_RESOLUTIONS; do
+        zip_name="ne_${resolution}_${name}.zip"
+        zip_url="https://naturalearth.s3.amazonaws.com/${resolution}_${category}/${zip_name}"
+        python -c "import urllib.request; urllib.request.urlretrieve('$zip_url', '$zip_name')"
+        python -m zipfile -e "$zip_name" "$MAP_DATA_ROOT/$category"
+    done
+done
 python -m build --wheel --outdir dist userconfig_src
 
 # 3. Copy the notebooks into the site's content folder, keeping their
