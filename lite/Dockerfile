@@ -8,8 +8,9 @@
 # Build the site into ./_output:
 #   docker run --rm -v $(pwd):/repo:ro -v $(pwd)/_output:/out argovis/lite-builder
 #
-# Preview the site at http://localhost:8000/ :
-#   docker run --rm -p 8000:8000 -v $(pwd)/_output:/srv -w /srv python:3.13-slim python -m http.server 8000
+# Preview the site at http://localhost:8000/ (see lite/serve_site.py for why
+# this is used instead of `python -m http.server`):
+#   docker run --rm -p 8000:8000 -v $(pwd)/_output:/srv -v $(pwd)/lite/serve_site.py:/serve_site.py:ro -w /srv python:3.13-slim python /serve_site.py
 #
 # The versions pinned below decide which Pyodide (and so which Python, numpy,
 # xarray, ...) the notebooks run on in the browser. jupyterlite-pyodide-kernel

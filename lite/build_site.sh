@@ -12,6 +12,7 @@ set -e
 NOTEBOOKS="
 introduction/PROFILES.ipynb
 introduction/Argovis_JSON.ipynb
+introduction/GRIDS.ipynb
 activities/ENSO_and_Equatorial_Kelvin_Waves.ipynb
 activities/Mediterranean_Sea_Outflow.ipynb
 activities/Meridional_Overturning_Circulation.ipynb
