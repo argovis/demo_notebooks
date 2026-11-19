@@ -24,6 +24,7 @@ activities/Ocean_Stratification_Intro.ipynb
 activities/Subsurface_Ocean_Features_and_Water_Masses.ipynb
 activities/Tropical_Cyclones_and_Ocean_Changes.ipynb
 dataset_specific_notebooks/Argo_float_location_forecasts.ipynb
+dataset_specific_notebooks/Argo_trajectories.ipynb
 dataset_specific_notebooks/Intro_to_Atmospheric_Rivers.ipynb
 "
 
