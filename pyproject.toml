@@ -1,7 +1,26 @@
 [project]
 name = "notebook_helpers"
 version = "0.0.1"
-dependencies = []
+# Every package that the modules in notebook_helpers/ import.
+# - Docker image: all of these are already installed by the Dockerfile before
+#   `pip install -e .` runs, so this list installs nothing there.
+# - JupyterLite site (see lite/): the browser only loads a package when a
+#   notebook cell imports it by name, or when it is listed here. Packages
+#   imported only inside notebook_helpers (for example jinja2, used for styled
+#   tables) are loaded because of this list.
+# If a helper module starts importing a new package, add it here.
+dependencies = [
+    "argovisHelpers",
+    "cartopy",
+    "gsw",
+    "jinja2",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "python-dateutil",
+    "scipy",
+    "xarray",
+]
 
 [tool.setuptools.packages.find]
 include = ["notebook_helpers*"]

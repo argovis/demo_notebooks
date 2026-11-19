@@ -11,6 +11,12 @@ set -e
 # To add a notebook to the site, add a line here.
 NOTEBOOKS="
 introduction/PROFILES.ipynb
+introduction/Argovis_JSON.ipynb
+activities/ENSO_and_Equatorial_Kelvin_Waves.ipynb
+activities/Mediterranean_Sea_Outflow.ipynb
+activities/Meridional_Overturning_Circulation.ipynb
+activities/Ocean_Stratification_Advanced.ipynb
+activities/Oxygen_Vertical_Structure.ipynb
 "
 
 cd /work
@@ -18,6 +24,8 @@ cp /repo/lite/jupyter_lite_config.json .
 
 # 1. Package notebook_helpers as a wheel so the browser kernel can import it.
 #    Build from a copy, because the repository is mounted read-only.
+#    The dependency list in pyproject.toml is what makes the browser load
+#    cartopy, jinja2 etc. along with notebook_helpers.
 mkdir -p helpers_src
 cp -r /repo/notebook_helpers /repo/pyproject.toml helpers_src/
 python -m build --wheel --outdir dist helpers_src
